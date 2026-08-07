@@ -16,12 +16,14 @@ Design goals (see RT-SFOD-Lite proposal, "Try 1"):
     while keeping representational capacity via the pointwise MLP that
     follows.
 
-Both classes below follow the exact constructor signature convention used by
-C2f/C3k2 (`c1, c2, n=1, shortcut=True, g=1, e=0.5`) so they can be registered
-in `base_modules` / `repeat_modules` inside `ultralytics/nn/tasks.py` and used
-directly from a YAML file, e.g.:
+C2fFaster follows the C2f positional signature
+`(c1, c2, n, shortcut, g, e)`.  This is intentionally NOT the same positional
+signature as C3k2, whose YAML arguments are `(c3k, e, attn, g, shortcut)`.
+When replacing a C3k2 YAML row, pass `g` explicitly before `e`; otherwise a
+value such as `0.25` is silently interpreted as `g` and `e` stays at 0.5.
+Example:
 
-    - [-1, 2, C2fFaster, [256, True]]   # same call convention as C3k2
+    - [-1, 2, C2fFaster, [256, False, 1, 0.25]]
 """
 
 from __future__ import annotations

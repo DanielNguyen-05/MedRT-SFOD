@@ -1,0 +1,8 @@
+# Add these on top of the existing MedRT-SFOD / Ultralytics environment.
+scikit-learn>=1.3
+kneed>=0.8.5
+torch-pruning>=1.5.3
+PIL
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # chọn bản cu12x khớp driver GPU
+# pip install opencv-python pyyaml numpy
+six
