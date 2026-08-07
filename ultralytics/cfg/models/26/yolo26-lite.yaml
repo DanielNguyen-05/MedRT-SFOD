@@ -1,0 +1,61 @@
+# RT-SFOD-Lite extension — AGPL-3.0 License (inherits from Ultralytics)
+#
+# YOLO26-Lite: same dual-head (one2one/one2many), NMS-free, 3-scale PAN
+# (P3/P4/P5) detector as yolo26.yaml, but the CSP backbone stages (C3k2) are
+# replaced by C2fFaster stages built from FasterNet-style Partial Convolution
+# (PConv) blocks. This is a *drop-in* backbone swap: neck and Detect head are
+# byte-for-byte identical to yolo26.yaml, so DHF and MARD in
+# scripts/YOLO26/stage2_rtsfod_yolo26.py require no changes to run on this
+# config — only --stage1_model / checkpoint change.
+#
+# Rationale (RT-SFOD-Lite "Try 1"): PConv targets the actual real-time
+# bottleneck (memory access), not just FLOPs on paper, matching this repo's
+# own emphasis on measured FPS (see Table 1/S.3 of the RT-SFOD paper) rather
+# than parameter count alone.
+
+# Parameters
+nc: 80 # number of classes
+end2end: True # whether to use end-to-end mode (required: DHF needs one2one + one2many)
+reg_max: 1 # DFL bins
+scales: # model compound scaling constants, i.e. 'model=yolo26-lite.yaml' will call this file with scale 'n'
+  # [depth, width, max_channels]
+  n: [0.50, 0.25, 1024]
+  s: [0.50, 0.50, 1024]
+  m: [0.50, 1.00, 512]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.50, 512]
+
+# YOLO26-Lite backbone (C3k2 -> C2fFaster)
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, Conv, [128, 3, 2]] # 1-P2/4
+  - [-1, 2, C2fFaster, [256, False, 0.25]]
+  - [-1, 1, Conv, [256, 3, 2]] # 3-P3/8
+  - [-1, 2, C2fFaster, [512, False, 0.25]]
+  - [-1, 1, Conv, [512, 3, 2]] # 5-P4/16
+  - [-1, 2, C2fFaster, [512, True]]
+  - [-1, 1, Conv, [1024, 3, 2]] # 7-P5/32
+  - [-1, 2, C2fFaster, [1024, True]]
+  - [-1, 1, SPPF, [1024, 5, 3, True]] # 9
+  - [-1, 2, C2PSA, [1024]] # 10
+
+# YOLO26-Lite head (unchanged from yolo26.yaml — required for DHF/MARD compatibility)
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 6], 1, Concat, [1]] # cat backbone P4
+  - [-1, 2, C3k2, [512, True]] # 13
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 4], 1, Concat, [1]] # cat backbone P3
+  - [-1, 2, C3k2, [256, True]] # 16 (P3/8-small)
+
+  - [-1, 1, Conv, [256, 3, 2]]
+  - [[-1, 13], 1, Concat, [1]] # cat head P4
+  - [-1, 2, C3k2, [512, True]] # 19 (P4/16-medium)
+
+  - [-1, 1, Conv, [512, 3, 2]]
+  - [[-1, 10], 1, Concat, [1]] # cat head P5
+  - [-1, 1, C3k2, [1024, True, 0.5, True]] # 22 (P5/32-large)
+
+  - [[16, 19, 22], 1, Detect, [nc]] # Detect(P3, P4, P5) — one2one + one2many, unchanged
