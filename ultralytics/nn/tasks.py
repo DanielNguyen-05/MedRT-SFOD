@@ -33,7 +33,6 @@ from ultralytics.nn.modules import (
     C2f,
     C2fAttn,
     C2fCIB,
-    C2fFaster,
     C2fPSA,
     C3Ghost,
     C3k2,
@@ -74,8 +73,8 @@ from ultralytics.nn.modules import (
     YOLOESegment26,
     v10Detect,
 )
-from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, SETTINGS, WINDOWS, YAML, colorstr, emojis
-from ultralytics.utils.checks import REMOTE_FILE_PREFIXES, check_file, check_requirements, check_suffix, check_yaml
+from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, WINDOWS, YAML, colorstr, emojis
+from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
     E2ELoss,
     PoseLoss26,
@@ -1513,8 +1512,6 @@ def load_checkpoint(weight, device=None, inplace=True, fuse=False):
         (torch.nn.Module): Loaded model.
         (dict): Model checkpoint dictionary.
     """
-    if str(weight).lower().startswith(REMOTE_FILE_PREFIXES):
-        weight = check_file(weight, download_dir=SETTINGS["weights_dir"])
     ckpt, weight = torch_safe_load(weight)  # load ckpt
     args = {**DEFAULT_CFG_DICT, **(ckpt.get("train_args", {}))}  # combine model and default args, preferring model args
     model = (ckpt.get("ema") or ckpt["model"]).float()  # FP32 model
@@ -1611,7 +1608,6 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
-            C2fFaster,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1621,7 +1617,6 @@ def parse_model(d, ch, verbose=True):
             C2,
             C2f,
             C3k2,
-            C2fFaster,
             C2fAttn,
             C3,
             C3TR,

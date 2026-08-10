@@ -619,56 +619,182 @@ class AdaptiveHiddenPruner:
 
     # ---- optional DepGraph audit ------------------------------------------
 
-    def audit_depgraph(self, example_inputs: torch.Tensor, require_local: bool = True) -> dict[str, dict]:
-        """Audit candidate roots with Torch-Pruning DepGraph.
+    def audit_depgraph(
+        self,
+        example_inputs: torch.Tensor,
+        require_local: bool = True,
+    ) -> dict[str, dict]:
+        """Audit RASP Bottleneck hidden groups on the pre-Detect YOLO graph.
 
-        This is an *audit*, not the training-time masking mechanism.  The method
-        checks that pruning one hidden output channel of cv1 produces a valid
-        dependency group and, when ``require_local`` is True, that all named
-        parameterized modules touched by the group remain inside the Bottleneck.
+        YOLO26 end-to-end inference uses a detached O2O path at the Detect head,
+        so tracing the final inference output can omit backbone/PAN modules from
+        Torch-Pruning's autograd dependency graph.
+
+        RASP does not structurally prune Detect outputs. Therefore the correct
+        structural audit traces the native YOLO graph only up to the feature maps
+        consumed by Detect (P3/P4/P5), while preserving the exact Ultralytics
+        routing through module.f and model.save.
         """
-
         try:
             import torch_pruning as tp
-        except Exception as exc:  # pragma: no cover - dependency-specific
-            raise RuntimeError("DepGraph audit requires `pip install torch-pruning`") from exc
+        except Exception as exc:
+            raise RuntimeError(
+                "DepGraph audit requires `pip install torch-pruning`"
+            ) from exc
 
-        # DepGraph needs autograd enabled.  Remove RASP forward hooks so its
-        # graph reflects the native dense model.
-        module_names = {id(m): n for n, m in self.model.named_modules()}
+        class _PreDetectTrace(nn.Module):
+            def __init__(self, base: nn.Module):
+                super().__init__()
+                self.base = base
+
+                if not hasattr(base, "model"):
+                    raise RuntimeError(
+                        "RASP DepGraph audit expected an Ultralytics "
+                        "DetectionModel with `.model`."
+                    )
+
+                self.head = base.model[-1]
+
+                if not hasattr(self.head, "f"):
+                    raise RuntimeError(
+                        "Final YOLO module has no `.f` routing information."
+                    )
+
+            def forward(self, x: torch.Tensor):
+                y = []
+
+                # Reproduce Ultralytics _predict_once routing,
+                # but stop before the Detect head.
+                for m in self.base.model[:-1]:
+                    if m.f != -1:
+                        if isinstance(m.f, int):
+                            x = y[m.f]
+                        else:
+                            x = [
+                                x if j == -1 else y[j]
+                                for j in m.f
+                            ]
+
+                    x = m(x)
+                    y.append(
+                        x if m.i in self.base.save else None
+                    )
+
+                f = self.head.f
+
+                if isinstance(f, int):
+                    feats = (
+                        x if f == -1 else y[f],
+                    )
+                else:
+                    feats = tuple(
+                        x if j == -1 else y[j]
+                        for j in f
+                    )
+
+                if any(v is None for v in feats):
+                    raise RuntimeError(
+                        "A Detect input feature was not saved while "
+                        f"building the RASP DepGraph; head.f={f}"
+                    )
+
+                return feats
+
+        module_names = {
+            id(m): n
+            for n, m in self.model.named_modules()
+        }
+
         results: dict[str, dict] = {}
+
         with self.suspended():
             was_training = self.model.training
             self.model.eval()
+
+            trace_model = _PreDetectTrace(self.model)
+            trace_model.eval()
+
+            # Torch-Pruning requires an autograd graph.
+            # Stage-1 AdaBN checkpoint may contain frozen parameters
+            # (requires_grad=False), therefore the dummy floating-point input
+            # must explicitly require gradients for DepGraph tracing.
+            #
+            # This changes only the audit input and does NOT modify model
+            # parameter requires_grad flags.
+            def _make_audit_input(x):
+                if isinstance(x, torch.Tensor):
+                    x = x.detach().clone()
+                    if x.is_floating_point():
+                        x.requires_grad_(True)
+                return x
+
+            if isinstance(example_inputs, (tuple, list)):
+                tp_inputs = tuple(
+                    _make_audit_input(x)
+                    for x in example_inputs
+                )
+            else:
+                tp_inputs = (
+                    _make_audit_input(example_inputs),
+                )
+                
             with torch.enable_grad():
-                DG = tp.DependencyGraph().build_dependency(self.model, example_inputs=example_inputs)
-            if was_training:
-                self.model.train()
+                DG = tp.DependencyGraph().build_dependency(
+                    trace_model,
+                    example_inputs=tp_inputs,
+                )
 
             for name, item in self.groups.items():
                 try:
-                    group = DG.get_pruning_group(item.first_conv, tp.prune_conv_out_channels, idxs=[0])
-                    valid = bool(DG.check_pruning_group(group))
+                    group = DG.get_pruning_group(
+                        item.first_conv,
+                        tp.prune_conv_out_channels,
+                        idxs=[0],
+                    )
+
+                    valid = bool(
+                        DG.check_pruning_group(group)
+                    )
+
                     outside = []
                     touched = []
+
                     for dep, _idxs in group:
                         target = dep.target.module
                         target_name = module_names.get(id(target))
+
+                        # Ignore synthetic/autograd nodes.
                         if target_name is None:
-                            continue  # synthetic concat/add/autograd node
+                            continue
+
                         touched.append(target_name)
-                        if require_local and not (target_name == name or target_name.startswith(name + ".")):
+
+                        if require_local and not (
+                            target_name == name
+                            or target_name.startswith(name + ".")
+                        ):
                             outside.append(target_name)
-                    ok = valid and (not outside)
-                    details = str(group.details() if hasattr(group, "details") else group)
+
+                    ok = valid and not outside
+
+                    details = str(
+                        group.details()
+                        if hasattr(group, "details")
+                        else group
+                    )
+
                 except Exception as exc:
                     ok = False
                     valid = False
                     outside = []
                     touched = []
-                    details = f"ERROR: {type(exc).__name__}: {exc}"
+                    details = (
+                        f"ERROR: {type(exc).__name__}: {exc}"
+                    )
+
                 item.depgraph_ok = bool(ok)
                 item.depgraph_details = details
+
                 results[name] = {
                     "ok": bool(ok),
                     "valid": bool(valid),
@@ -676,6 +802,10 @@ class AdaptiveHiddenPruner:
                     "touched_named_modules": touched,
                     "details": details,
                 }
+
+            if was_training:
+                self.model.train()
+
         return results
 
 

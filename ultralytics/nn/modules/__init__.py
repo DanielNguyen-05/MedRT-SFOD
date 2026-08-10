@@ -60,7 +60,6 @@ from .block import (
     SCDown,
     TorchVision,
 )
-from .lite_block import C2fFaster, FasterNetBlock, PConv
 from .conv import (
     CBAM,
     ChannelAttention,
@@ -112,15 +111,12 @@ __all__ = (
     "C1",
     "C2",
     "C2PSA",
-    "C2fFaster",
     "C3",
     "C3TR",
     "CBAM",
     "CIB",
     "DFL",
     "ELAN1",
-    "FasterNetBlock",
-    "PConv",
     "MLP",
     "OBB",
     "OBB26",

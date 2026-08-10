@@ -416,17 +416,18 @@ def main(args: argparse.Namespace) -> None:
                 flush=True,
             )
 
-            save_this_epoch = epoch % args.save_interval == 0 or epoch == args.epochs
-            eval_this_epoch = args.eval and epoch % args.val_interval == 0
+            save_this_epoch = (epoch % args.save_interval == 0 or epoch == args.epochs)
+            eval_this_epoch = (args.eval and epoch % args.val_interval == 0)
+            detach_hook_for_io = save_this_epoch or eval_this_epoch
+
+            if detach_hook_for_io and hook is not None:
+                hook.latest = None
+                hook.close()
+                hook = None
 
             if save_this_epoch:
-                # Save a standard Ultralytics checkpoint of the *dense latent*
-                # student plus a complete RASP training state carrying masks.
-                latent_path = checkpoint_dir / f"yolo26_rasp_latent_epoch_{epoch}.pt"
-                with rasp.suspended():
-                    student_wrapper.model = student_model
-                    student_wrapper.save(str(latent_path))
                 state_path = _state_path(out_dir, epoch)
+                
                 _save_training_state(
                     state_path,
                     epoch=epoch,
@@ -439,7 +440,7 @@ def main(args: argparse.Namespace) -> None:
                     rasp=rasp,
                     args=args,
                 )
-                # latest is convenient for Colab preemption/resume.
+
                 _save_training_state(
                     _latest_state_path(out_dir),
                     epoch=epoch,
@@ -452,7 +453,17 @@ def main(args: argparse.Namespace) -> None:
                     rasp=rasp,
                     args=args,
                 )
-                print(f"[Epoch {epoch:03d}] saved latent={latent_path.name} state={state_path.name}", flush=True)
+
+                latent_path = checkpoint_dir / f"yolo26_rasp_latent_epoch_{epoch}.pt"
+                with rasp.suspended():
+                    student_wrapper.model = student_model
+                    student_wrapper.save(str(latent_path))
+
+
+                print(f"[Epoch {epoch}] saved latent={latent_path.name} state={state_path.name}", flush=True)
+            
+            if detach_hook_for_io:
+                hook = DetectInputFeatureHook(student_model)
 
             if eval_this_epoch:
                 student_model.eval()
