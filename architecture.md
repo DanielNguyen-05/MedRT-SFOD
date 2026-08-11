@@ -1,442 +1,751 @@
-# RASP-SFOD
-
-**Reliability-Aware Structured Pruning for Source-Free Object Detection**
-
-Mục tiêu của phương pháp là:
-
-> **Nén Student ngay trong quá trình source-free domain adaptation, nhưng chỉ prune khi target-domain evidence cho thấy channel đó ít quan trọng và Teacher đủ đáng tin cậy.**
-
-Điểm quan trọng là RASP-SFOD **không phải “train xong rồi prune”**. Việc pruning trở thành **một phần của quá trình adaptation**.
-
----
-
-# 1. Bài toán mà phương pháp đang giải quyết
-
-Bối cảnh là Source-Free Object Detection.
-
-Ta có:
+Architecture chính là:
 
 ```text
-Source domain:
-Clear Cityscapes
-→ có image + label
-```
-
-sau khi source training xong, ta chỉ còn:
-
-```text
-Source-trained YOLO26-M checkpoint
-```
-
-Khi chuyển sang target domain:
-
-```text
-Target domain:
-Foggy Cityscapes
-→ chỉ được dùng image
-→ KHÔNG được dùng target label trong adaptation
-```
-
-Mục tiêu thông thường của RT-SFOD là:
-
-[
-\text{Source model}
-\rightarrow
-\text{adapt to target}
-\rightarrow
-\text{better target accuracy}
-]
-
-Còn proposed method của bạn muốn đồng thời đạt:
-
-[
-\boxed{
-\text{Target adaptation}
-+
-\text{Model compression}
-}
-]
-
-tức là cuối cùng có một model:
-
-```text
-nhỏ hơn
-↓
-ít FLOPs hơn
-↓
-nhanh hơn
-↓
-nhưng vẫn giữ target-domain accuracy tốt
-```
-
-Khó khăn nằm ở chỗ:
-
-> Nếu prune model quá sớm hoặc prune sai channel trong source-free adaptation, pseudo-label vốn đã noisy sẽ làm Student suy giảm rất nhanh.
-
-Do đó RASP không hỏi đơn giản:
-
-> “Channel nào có weight nhỏ?”
-
-mà hỏi:
-
-> **“Trên target domain hiện tại, channel nào thực sự ít quan trọng, có redundancy, tiết kiệm compute đáng kể, và tại thời điểm này Teacher có đủ đáng tin để ta prune hay chưa?”**
-
-Đó chính là tư tưởng cốt lõi.
-
----
-
-# 2. Tổng pipeline
-
-Pipeline hoàn chỉnh là:
-
-```text
-Clear Cityscapes train + labels
-        ↓
-Supervised source training
-        ↓
-YOLO26-M source checkpoint
-        ↓
-Foggy Cityscapes train images only
-        ↓
-AdaBN
-        ↓
-Target-warmed YOLO26-M checkpoint
-        ↓
-RASP graph audit
-        ↓
-Mean Teacher adaptation
-Teacher (dense) → pseudo-labels → Student
-                         ↓
-                RT-SFOD losses
-                         ↓
-                target-aware Taylor
-                         ↓
-                GMM redundancy
-                         ↓
-                cost-aware ranking
-                         ↓
-                Kneedle adaptive budget
-                         ↓
-                reliability gate
-                         ↓
-              progressive structured prune
-                         ↓
-                   recovery training
-                         ↓
-               repeat during adaptation
-                         ↓
-             final masked Student
-                         ↓
-             physical graph compaction
-                         ↓
-        compact RASP-SFOD-Y26 model
-```
-
-Có thể chia method thành 3 tầng:
-
-```text
-RT-SFOD adaptation backbone
-        +
-RASP pruning controller
-        +
-final structural compaction
-```
-
----
-
-# 3. Phần nào giữ nguyên từ RT-SFOD?
-
-RASP **không thay thế RT-SFOD**.
-
-RT-SFOD vẫn là adaptation framework chính.
-
-Bạn giữ:
-
-```text
+YOLO26-M
+   +
 Mean Teacher
-+
-Dual-Head Fusion (DHF)
-+
+   +
+DHF
+   +
 MARD
+   +
+RASP structured pruning
 ```
 
-RASP được gắn vào bên Student.
-
-Tức là:
-
-[
-\boxed{
-\text{RASP-SFOD}
-================
-
-\text{RT-SFOD}
-+
-\text{adaptive structured pruning}
-}
-]
-
-Điều này rất quan trọng về mặt paper.
-
-Bạn không muốn nói:
-
-> “We propose a completely new SFOD framework.”
-
-mà chính xác hơn là:
-
-> “We introduce a reliability-aware structured pruning mechanism into source-free Mean-Teacher adaptation.”
+Trong đó RASP chỉ thay đổi Student trong quá trình adaptation và cuối cùng compact một số **hidden channels bên trong Bottleneck**; backbone/neck/head bên ngoài vẫn giữ topology YOLO26-M. Điều này đúng với thiết kế trong code RASP: Teacher dense, Student giữ dense latent parameters, RASP gate hidden channels, sau đó physical export mới thực sự cắt channel. 
 
 ---
 
-# 4. Mean Teacher trong method
+# 1. Nhìn toàn bộ architecture trước
 
-Sau AdaBN, tạo:
+Có thể hình dung toàn bộ project như sau:
+
+```text
+                    SOURCE TRAINING
+                         │
+                         ▼
+                COCO YOLO26-M pretrained
+                         │
+                         ▼
+                 Clear Cityscapes
+                  supervised train
+                         │
+                         ▼
+              Source YOLO26-M (8 class)
+                         │
+                         ▼
+                 Stage-1 AdaBN
+              Foggy images, no labels
+                         │
+                         ▼
+                Stage-1 YOLO26-M
+                         │
+          ┌──────────────┴──────────────┐
+          │                             │
+          ▼                             ▼
+   Dense RT-SFOD                   RASP-SFOD
+          │                             │
+          │                             │
+   ┌──────┴──────┐               ┌──────┴──────┐
+   │   Teacher   │               │   Teacher   │
+   │ YOLO26-M    │               │ YOLO26-M    │
+   │   dense     │               │   dense     │
+   └──────┬──────┘               └──────┬──────┘
+          │ weak                       │ weak
+          │ DHF pseudo labels          │ DHF pseudo labels
+          ▼                            ▼
+   ┌─────────────┐              ┌────────────────┐
+   │   Student   │              │     Student    │
+   │ YOLO26-M    │              │ YOLO26-M latent│
+   │   dense     │              │ + RASP gates   │
+   └──────┬──────┘              └────────┬───────┘
+          │                              │
+    Detection Loss                 Detection Loss
+          +                              +
+        MARD                           MARD
+                                         +
+                               Taylor importance
+                                         │
+                                         ▼
+                                    GMM selection
+                                         │
+                                         ▼
+                                   Cost ranking
+                                         │
+                                         ▼
+                                     Kneedle
+                                         │
+                                         ▼
+                                 structured masks
+                                         │
+                                         ▼
+                                  physical export
+                                         │
+                                         ▼
+                          YOLO26-M RASP compact
+```
+
+---
+
+# 2. Base detector thực tế: YOLO26-M
+
+File architecture gốc là `yolo26.yaml`.
+
+Nó khai báo:
+
+```yaml
+nc: 80
+end2end: True
+reg_max: 1
+```
+
+và scale `m` là:
+
+```yaml
+m: [0.50, 1.00, 512]
+```
+
+tức:
+
+```text
+depth multiplier = 0.50
+width multiplier = 1.00
+max channels     = 512
+```
+
+YOLO26-M COCO gốc khoảng **21.896M parameters**. 
+
+Sau khi train Cityscapes 8 classes, Detect head đổi từ:
+
+```text
+80 classes
+↓
+8 classes
+```
+
+nên model main của chúng tôi còn:
+
+```text
+21,785,224 parameters
+≈ 21.785M
+```
+
+Log source run xác nhận đây là YOLO26-M và pretrained weights được transfer vào model. 
+
+---
+
+# 3. YOLO26-M gồm 3 phần
+
+Về mặt detector, ta có:
+
+```text
+INPUT
+  │
+  ▼
+BACKBONE
+  │
+  ├── P3
+  ├── P4
+  └── P5
+  │
+  ▼
+PAN / NECK
+  │
+  ├── P3/8
+  ├── P4/16
+  └── P5/32
+  │
+  ▼
+END-TO-END DUAL DETECT HEAD
+  ├── One-to-Many
+  └── One-to-One
+```
+
+YOLO config thực tế đưa ba feature maps ở layer `16`, `19`, `22` vào Detect. 
+
+---
+
+# 4. Backbone YOLO26-M
+
+Với input main experiment:
+
+```text
+1024 × 1024 × 3
+```
+
+flow có thể hình dung gần như:
+
+```text
+Input
+1024×1024×3
+       │
+       ▼
+Conv 3×3 stride 2
+64 channels
+512×512
+       │
+       ▼
+Conv 3×3 stride 2
+128 channels
+256×256
+       │
+       ▼
+C3k2
+256 channels
+       │
+       ▼
+Conv stride 2
+256 channels
+128×128              ← backbone P3
+       │
+       ▼
+C3k2
+512 channels
+       │
+       ▼
+Conv stride 2
+512 channels
+64×64                ← backbone P4
+       │
+       ▼
+C3k2
+512 channels
+       │
+       ▼
+Conv stride 2
+512 channels
+32×32                ← backbone P5
+       │
+       ▼
+C3k2
+       │
+       ▼
+SPPF
+       │
+       ▼
+C2PSA
+```
+
+Architecture YAML khai báo chuỗi `Conv → C3k2 → ... → SPPF → C2PSA`; scale M dùng width `1.0` và max channel `512`, nên các stage khai báo 1024 được clamp theo scale parser.  Parser của fork cũng thực hiện scaling bằng `min(c2, max_channels) * width`. 
+
+### C3k2 làm gì?
+
+Có thể hiểu C3k2 là một **CSP-style feature aggregation block**. Quan trọng đối với RASP là bên trong các C3k2 này tồn tại các standard `Bottleneck`.
+
+Một Bottleneck mà RASP quan tâm có dạng:
+
+```text
+                 ┌──────────── shortcut ────────────┐
+                 │                                  │
+input C ──► cv1 ──► hidden H ──► cv2 ──► output C ─┤
+                 │                                  │
+                 └──────────────────────────────────┘
+```
+
+RASP không prune toàn bộ C3k2. Nó đi vào trong và tìm các standard `Bottleneck` có:
+
+```text
+cv1.out_channels == cv2.in_channels
+groups = 1
+```
+
+
+
+### SPPF
+
+SPPF nằm cuối backbone, trước attention:
+
+```text
+C3k2
+ ↓
+SPPF
+ ↓
+C2PSA
+```
+
+Mục đích ở mức architecture là tăng receptive field / tổng hợp multi-scale context trước khi đưa feature sang neck.
+
+### C2PSA
+
+C2PSA là attention block ở high-level feature stage.
+
+Điểm quan trọng với project của chúng tôi:
+
+```text
+C2PSA không bị RASP prune
+```
+
+RASP chủ động exclude:
+
+```text
+c2psa
+attn
+psa
+one2one
+one2many
+dfl
+```
+
+
+
+---
+
+# 5. Neck/PAN
+
+Sau backbone, YOLO26 tạo feature pyramid theo cả **top-down** và **bottom-up**.
+
+Top-down:
+
+```text
+P5
+ │
+Upsample ×2
+ │
+Concat với backbone P4
+ │
+C3k2
+ │
+ ▼
+P4 feature
+ │
+Upsample ×2
+ │
+Concat với backbone P3
+ │
+C3k2
+ │
+ ▼
+P3/8
+```
+
+Sau đó bottom-up:
+
+```text
+P3
+ │
+Conv stride 2
+ │
+Concat P4
+ │
+C3k2
+ ▼
+P4/16
+ │
+Conv stride 2
+ │
+Concat P5
+ │
+C3k2
+ ▼
+P5/32
+```
+
+Đây chính xác là layer 11–22 của YAML. 
+
+Cuối cùng Detect nhận:
+
+```text
+P3 = layer 16
+P4 = layer 19
+P5 = layer 22
+```
+
+Với YOLO26-M 8-class hiện tại, ba input vào Detect thực tế là:
+
+```text
+P3 : 256 channels, stride 8
+P4 : 512 channels, stride 16
+P5 : 512 channels, stride 32
+```
+
+Ở input `1024×1024`:
+
+```text
+P3 ≈ 256 × 128 × 128
+P4 ≈ 512 ×  64 ×  64
+P5 ≈ 512 ×  32 ×  32
+```
+
+---
+
+# 6. Detect head của YOLO26 khác YOLO truyền thống ở điểm quan trọng
+
+Chúng tôi đang dùng:
+
+```yaml
+end2end: True
+```
+
+Nên Detect head có **hai assignment branches**:
+
+```text
+               P3 / P4 / P5
+                    │
+             ┌──────┴──────┐
+             │             │
+             ▼             ▼
+        One-to-Many    One-to-One
+           O2M            O2O
+             │             │
+             └──────┬──────┘
+                    │
+                 training
+```
+
+Code Detect tạo box regression `cv2` và classification `cv3`. Khi `end2end=True`, nó deepcopy chúng thành `one2one_cv2` và `one2one_cv3`. 
+
+Trong forward:
+
+```python
+preds = one2many(x)
+
+x_detach = x.detach()
+one2one = one2one(x_detach)
+
+preds = {
+    "one2many": ...,
+    "one2one": ...
+}
+```
+
+Training trả cả hai branches.
+
+Inference thì:
+
+```text
+chỉ O2O
+↓
+decode
+↓
+postprocess
+```
+
+
+
+Đây là lý do RT-SFOD có thể làm DHF: Teacher có đồng thời **O2O + O2M** trong training/adaptation.
+
+---
+
+# 7. Head box và classification bên trong
+
+Mỗi scale có hai loại prediction path.
+
+Box regression:
+
+```text
+feature
+  ↓
+Conv
+  ↓
+Conv
+  ↓
+Conv2d → bbox parameters
+```
+
+Classification path của non-legacy head dùng depthwise separable structure:
+
+```text
+feature
+ ↓
+DWConv
+ ↓
+1×1 Conv
+ ↓
+DWConv
+ ↓
+1×1 Conv
+ ↓
+Conv2d → class logits
+```
+
+Code này nằm trực tiếp trong `Detect`. 
+
+Trong config YOLO26 của chúng tôi:
+
+```text
+reg_max = 1
+```
+
+nên DFL module của head trở thành Identity thay vì distribution projection nhiều bins. 
+
+---
+
+# 8. Sau source training: architecture không đổi
+
+Source stage chỉ biến:
+
+```text
+COCO YOLO26-M
+80 classes
+```
+
+thành:
+
+```text
+Cityscapes YOLO26-M
+8 classes
+```
+
+Backbone/PAN topology vẫn giữ nguyên.
+
+Tức:
+
+```text
+YOLO26-M COCO
+      │
+      ▼
+fine-tune
+      │
+      ▼
+YOLO26-M Cityscapes 8 classes
+```
+
+---
+
+# 9. Stage-1 AdaBN cũng không thay architecture
+
+Stage-1 dùng chính YOLO26-M source model.
+
+Ta không thêm layer mới.
+
+Ý tưởng đơn giản là:
+
+```text
+Source BN statistics
+       │
+Foggy images
+       ▼
+update BN running mean / variance
+       │
+       ▼
+Target-adapted BN statistics
+```
+
+Model weights không được train như Stage-2; Stage-1 chủ yếu chạy target images qua mạng để cập nhật BN statistics.
+
+Vì vậy:
+
+```text
+before AdaBN: YOLO26-M
+after AdaBN : YOLO26-M
+```
+
+Architecture không thay đổi.
+
+---
+
+# 10. Stage-2 đưa YOLO26-M vào Mean Teacher
+
+Đây mới là architecture tổng của RT-SFOD:
+
+```text
+                   Stage-1 checkpoint
+                          │
+                  ┌───────┴───────┐
+                  │               │
+                  ▼               ▼
+              TEACHER          STUDENT
+              YOLO26-M         YOLO26-M
+               frozen          trainable
+                  │               │
+            weak image       strong image
+                  │               │
+                  ▼               ▼
+           O2O + O2M          O2O + O2M
+                  │               │
+                 DHF          Detection loss
+                  │               │
+          pseudo labels            │
+                  │               │
+                  └────────► MARD ─┘
+                                  │
+                                  ▼
+                                loss
+                                  │
+                                  ▼
+                              Student
+                                  │
+                                  │ epoch end
+                                  ▼
+                             EMA update
+                                  │
+                                  ▼
+                              Teacher
+```
+
+Teacher và Student đều được tạo từ **cùng Stage-1 checkpoint**. Teacher `eval()` và không require gradient; Student trainable. 
+
+---
+
+# 11. Weak view và strong view
+
+Teacher nhìn ảnh **weakly augmented**.
+
+Student nhìn **strongly augmented** version của cùng ảnh.
+
+Weak:
+
+```text
+resize
++
+shared horizontal flip
+```
+
+Strong ngoài resize/shared flip còn có thể gồm:
+
+```text
+affine scale/translation
+perspective
+HSV
+brightness/contrast
+gamma
+RGB channel shuffle
+Gaussian blur
+Gaussian noise
+salt-and-pepper corruption
+```
+
+Các transformation hình học được lưu lại để pseudo boxes Teacher tạo trên weak view có thể map chính xác sang strong view. 
+
+---
+
+# 12. DHF — Dual-Head Fusion
+
+Đây là phần đầu tiên RT-SFOD thêm lên YOLO26.
+
+Teacher weak image:
 
 ```text
 Teacher
-Student
+   │
+   ├── O2O predictions
+   │
+   └── O2M predictions
 ```
 
-ban đầu cùng từ checkpoint đã được target-warm-up.
-
-Trong mỗi target batch:
+Chúng tôi dùng:
 
 ```text
-target image
-     ↓
- ┌──────────────┐
- │              │
-weak view    strong view
- │              │
-Teacher       Student
- │              │
-pseudo labels   predictions
- └──────→ loss ←┘
+tau_o2o = 0.5
+tau_o2m = 0.5
+tau_no  = 0.2
+tau_dup = 0.7
 ```
 
-Teacher không học bằng optimizer.
-
-Teacher cập nhật bằng EMA:
-
-[
-\theta_T
-\leftarrow
-\alpha\theta_T
-+
-(1-\alpha)\theta_S
-]
-
-với:
-
-[
-\alpha \approx 0.999
-]
-
-Teacher đóng vai trò:
+Flow chính xác:
 
 ```text
-pseudo-label generator
-+
-reliability reference
+O2O predictions
+confidence ≥ 0.5
+       │
+       ▼
+high-precision anchors
+       │
+       │
+       │          O2M predictions
+       │          confidence ≥ 0.5
+       │                 │
+       │                 ▼
+       │       compare IoU với O2O
+       │                 │
+       │          max IoU ≤ 0.2
+       │                 │
+       │                 ▼
+       │          non-overlap extras
+       │                 │
+       │       classwise NMS @ 0.7
+       │                 │
+       └─────────┬───────┘
+                 ▼
+          fused pseudo labels
 ```
 
-Student mới là network thực sự được gradient update.
+Code thực hiện đúng sequence này. 
 
----
-
-# 5. Vì sao Teacher phải dense?
-
-Đây là một thiết kế rất quan trọng của RASP.
-
-Teacher:
-
-```text
-DENSE
-```
-
-Student:
-
-```text
-progressively PRUNED
-```
-
-Không prune Teacher.
-
-Lý do đầu tiên là ổn định pseudo-label.
-
-Nếu cả Teacher và Student cùng bị prune:
-
-```text
-Student bị mất capacity
-        ↓
-Teacher EMA cũng mất capacity
-        ↓
-pseudo-label quality giảm
-        ↓
-Student học từ pseudo-label yếu hơn
-        ↓
-feedback loop tiêu cực
-```
-
-Trong RASP:
-
-```text
-Teacher = stable dense reference
-
-Student = compression target
-```
-
-Do đó Teacher vẫn giữ khả năng biểu diễn đầy đủ để hướng dẫn Student.
-
----
-
-# 6. Một vấn đề kỹ thuật: Teacher và Student vẫn phải shape-compatible
-
-Mean Teacher cần EMA giữa hai model có tensor shape giống nhau.
-
-Vì vậy bạn **không physically delete channel trong quá trình training**.
-
-Thay vào đó:
-
-```text
-Student latent weights
-vẫn giữ original shape
-```
-
-nhưng forward sử dụng:
-
-```text
-channel masks / gates
-```
-
-Ví dụ:
-
-[
-z'_g = m_g z_g
-]
-
-với:
-
-[
-m_g \in {0,1}
-]
-
-Nếu:
-
-```text
-m_g = 1
-```
-
-channel active.
-
-Nếu:
-
-```text
-m_g = 0
-```
-
-channel bị prune trong forward.
-
-Nhưng tensor weight vẫn tồn tại.
-
-Do đó:
-
-```text
-Teacher shape = Student latent shape
-```
-
-EMA vẫn hoạt động.
-
-Đây là khác biệt rất quan trọng giữa:
-
-```text
-training-time masking
-```
-
-và:
-
-```text
-deployment-time physical pruning
-```
-
----
-
-# 7. RT-SFOD pseudo-labels: DHF
-
-YOLO26 là dual-head end-to-end detector.
-
-Có:
-
-```text
-O2O = one-to-one head
-O2M = one-to-many head
-```
-
-RT-SFOD không chỉ lấy toàn bộ prediction từ một head.
-
-DHF dùng:
+Tư tưởng là:
 
 ```text
 O2O
 → precision cao
-→ làm anchor pseudo-label
-```
+→ làm anchor
 
-và bổ sung một số O2M prediction không redundant.
+O2M
+→ có thể tìm thêm object mà O2O bỏ sót
 
-Conceptually:
-
-```text
-O2O high-confidence boxes
-        ↓
-main pseudo labels
-
-O2M high-confidence candidates
-        ↓
-check overlap with O2O
-        ↓
-low-overlap candidate
-        ↓
-keep
-```
-
-Current settings:
-
-[
-\tau_{O2O}=0.5
-]
-
-[
-\tau_{O2M}=0.5
-]
-
-O2M candidate được thêm nếu:
-
-[
-\max IoU(O2M,O2O)\leq0.2
-]
-
-sau đó class-wise NMS:
-
-[
-IoU_{NMS}=0.7
-]
-
-DHF cho RASP hai thứ:
-
-```text
-1. pseudo-label supervision
-2. reliability signal
+DHF
+→ chỉ lấy O2M bổ sung nếu không redundant với O2O
 ```
 
 ---
 
-# 8. MARD vẫn giữ nguyên
+# 13. Pseudo labels được map sang Student
 
-MARD:
+Teacher tạo:
 
-**Multi-scale Adaptive Representation Diversification**
+```text
+[x1, y1, x2, y2, confidence, class]
+```
 
-được áp dụng lên PAN features:
+trên weak image.
+
+Sau đó project áp dụng lại:
+
+```text
+affine matrix
+perspective matrix
+```
+
+để chuyển box sang coordinate của strong image. Box quá nhỏ sau transformation bị loại.
+
+Sau đó Student học chính các pseudo-label này. 
+
+---
+
+# 14. Student detection loss
+
+Student output phải có:
+
+```text
+one2one
+one2many
+```
+
+Pseudo boxes được đổi:
+
+```text
+xyxy
+→ xywh
+→ normalized
+```
+
+rồi đưa vào **native YOLO criterion**.
+
+Code không viết một detection loss khác từ đầu; nó gọi trực tiếp criterion của YOLO model. 
+
+Ta có thể viết:
+
+[
+L_{\text{det}}
+==============
+
+L_{\text{box}}
++
+L_{\text{cls}}
++
+L_{\text{dfl}}
+]
+
+với weighting do criterion YOLO xử lý.
+
+---
+
+# 15. MARD — regularization trên P3/P4/P5
+
+DHF giải quyết **pseudo-label quality**.
+
+MARD giải quyết **feature quality**.
+
+Trước Detect head, code gắn một forward pre-hook để lấy chính:
 
 ```text
 P3
@@ -444,1746 +753,1076 @@ P4
 P5
 ```
 
-Mục đích là hạn chế feature representation collapse dưới domain shift.
+đang được đưa vào Detect. 
 
-Loss tổng của Student có thể viết đơn giản:
+Flow:
 
-[
-L_{\text{SFOD}}
-===============
-
-L_{\text{det}}
-+
-\lambda_M L_{\text{MARD}}
-]
-
-Đây chính là loss mà RASP dùng để tính **target-domain sensitivity**.
-
-Và đây là điểm hay:
-
-> Pruning criterion không được tính từ source data nữa. Nó được lấy trực tiếp từ loss mà Student đang tối ưu trên target domain.
+```text
+Student strong image
+        │
+        ▼
+      Backbone
+        │
+        ▼
+       PAN
+        │
+  ┌─────┼─────┐
+  ▼     ▼     ▼
+ P3    P4    P5
+  │     │     │
+  └─────┼─────┘
+        ▼
+       MARD
+```
 
 ---
 
-# 9. RASP audit nằm ở đâu?
+# 16. MARD chọn feature như thế nào?
 
-Sau AdaBN, trước 60-epoch adaptation:
+Pseudo boxes confidence thấp hơn `0.5` bị bỏ.
 
-```text
-AdaBN checkpoint
-      ↓
-RASP audit
-```
-
-Audit không train model.
-
-Nó phân tích graph để tìm:
+Tối đa:
 
 ```text
-safe pruning groups
+15 boxes/image
 ```
 
-Ví dụ đơn giản:
+Box được phân về feature scale tùy kích thước:
 
 ```text
-C
-↓
-Conv1
-↓
-H channels
-↓
-Conv2
-↓
-C
+small  → P3
+medium → P4
+large  → P5
 ```
 
-Ta có thể prune hidden dimension:
-
-[
-H
-]
-
-mà vẫn giữ external dimension:
-
-[
-C
-]
-
-không đổi.
-
-Audit còn xác định dependency:
+Sau đó mỗi box sample:
 
 ```text
-Conv output
-↓
-BN
-↓
-next Conv input
+8 foreground points
 ```
 
-Nếu prune output channel (k) của Conv A thì khi compact:
+và mỗi level sample:
 
 ```text
-BN channel k
+128 background points
 ```
 
-và:
-
-```text
-input channel k của Conv B
-```
-
-cũng phải bỏ.
-
-Nếu không, graph sẽ lỗi shape.
+Các hyperparameter này được khai báo trực tiếp trong Stage-2. 
 
 ---
 
-# 10. Đơn vị pruning của RASP là group, không phải weight
+# 17. MARD có hai loss
 
-Đây là **structured pruning**.
+### Variance term
 
-Không phải:
-
-```text
-delete individual scalar weights
-```
-
-mà là:
-
-```text
-channel / dependency group
-```
-
-ký hiệu:
+Cho feature tokens (z), mỗi channel phải có đủ variation:
 
 [
-g
+L_{var}
+=======
+
+\frac{1}{C}
+\sum_c
+\max(0,\gamma-\sigma_c)
 ]
 
-Một group có thể đại diện cho:
+với:
 
 ```text
-one output channel
-+
-associated BN channel
-+
-corresponding downstream input channels
+γ = 1.0
 ```
 
-Vì vậy model cuối cùng có thể thực sự:
+Code:
+
+```python
+std = sqrt(var + eps)
+relu(gamma - std)
+```
+
+
+
+Nó ngăn:
 
 ```text
-fewer channels
-↓
-fewer parameters
-↓
-fewer MACs/FLOPs
-↓
-faster inference
+nhiều channel collapse
+→ feature trở nên giống/hằng
 ```
 
-Khác với unstructured sparsity chỉ tạo nhiều số 0.
+### Covariance term
+
+Các channel không nên quá correlated.
+
+Code normalize feature rồi tính covariance matrix và penalize off-diagonal terms. 
+
+Nôm na:
+
+```text
+channel 1 ≈ channel 2 ≈ channel 3
+```
+
+là không tốt.
+
+MARD muốn:
+
+```text
+các channel mang thông tin đa dạng hơn
+```
 
 ---
 
-# 11. Target-aware Taylor importance
+# 18. Tổng MARD loss
 
-Đây là thành phần quan trọng nhất để trả lời:
-
-> “Channel nào quan trọng đối với TARGET domain?”
-
-Với activation của pruning group:
+Ở mỗi level:
 
 [
-z_g
+L_{MARD}^{(l)}
+==============
+
+\alpha L_{var}^{(l)}
++
+\beta L_{cov}^{(l)}
 ]
 
-Taylor importance:
+với:
+
+```text
+α = 1.0
+β = 0.1
+```
+
+Sau đó:
 
 [
-I_g
-===
+L_{MARD}
+========
 
+L_{P3}+L_{P4}+L_{P5}
+]
+
+Code thực sự cộng cả ba levels. 
+
+Tổng Student loss:
+
+[
+\boxed{
+L_{total}
+=========
+
+L_{det}
++
+\lambda(t,q)L_{MARD}
+}
+]
+
+Trong đó (\lambda) phụ thuộc:
+
+```text
+training warmup
++
+pseudo-label confidence
+```
+
+
+
+---
+
+# 19. Mean Teacher update
+
+Sau khi Student train hết **một epoch**:
+
+[
+\theta_T
+\leftarrow
+m\theta_T+(1-m)\theta_S
+]
+
+với:
+
+```text
+m = 0.999
+```
+
+Code:
+
+```python
+teacher_param =
+    momentum * teacher_param
+    + (1 - momentum) * student_param
+```
+
+
+
+Vậy feedback loop là:
+
+```text
+Teacher
+  ↓
+better pseudo labels
+  ↓
+Student learns
+  ↓
 EMA
-\left[
-\left|
-z_g
-\frac{\partial L_{\text{SFOD}}}{\partial z_g}
-\right|
-\right]
-]
-
-Hiểu trực quan:
-
-Nếu thay đổi channel (g) một chút mà loss thay đổi mạnh:
-
-```text
-gradient lớn
-×
-activation lớn
+  ↓
+better Teacher
+  ↓
+...
 ```
-
-thì:
-
-[
-I_g \text{ lớn}
-]
-
-→ channel quan trọng.
-
-Nếu:
-
-[
-I_g \text{ nhỏ}
-]
-
-→ bỏ channel đó có khả năng gây ít damage.
-
-Đặc biệt, loss ở đây là:
-
-[
-L_{\text{det}}
-+
-\lambda_M L_{\text{MARD}}
-]
-
-nên importance phản ánh:
-
-```text
-pseudo-label detection usefulness
-+
-target feature representation usefulness
-```
-
-chứ không đơn thuần magnitude của weight.
 
 ---
 
-# 12. Vì sao cần EMA cho Taylor?
+# 20. Dense RT-SFOD architecture cuối cùng
 
-Importance của một batch rất noisy.
+Dense baseline chính xác là:
+
+```text
+Dense Teacher YOLO26-M
+        │
+        │ weak Foggy
+        ▼
+ O2O + O2M predictions
+        │
+        ▼
+       DHF
+        │
+        ▼
+ pseudo-labels
+        │
+        ▼
+ geometry mapping
+        │
+        ▼
+Dense Student YOLO26-M
+ strong Foggy image
+        │
+        ├──── native YOLO detection loss
+        │
+        └──── P3/P4/P5 → MARD
+                       │
+                       ▼
+                   total loss
+                       │
+                       ▼
+                  update Student
+                       │
+                    epoch
+                       ▼
+                      EMA
+                       │
+                       ▼
+                  update Teacher
+```
+
+---
+
+# 21. RASP-SFOD giữ toàn bộ RT-SFOD đó
+
+RASP **không thay DHF**.
+
+RASP **không thay MARD**.
+
+RASP **không thay Teacher**.
+
+RASP **không thay Detect**.
+
+RASP chỉ thêm một nhánh điều khiển Student:
+
+```text
+                          Student
+                             │
+                      forward + backward
+                             │
+                             ▼
+                     Taylor importance
+                             │
+                             ▼
+                         RASP logic
+                             │
+                             ▼
+                     channel masks
+```
+
+Code RASP Stage-2 ghi rõ RT-SFOD Mean Teacher, DHF, MARD, augmentation, native losses và epoch EMA đều giữ nguyên; learning mechanism thêm vào là student-only adaptive structured pruning. 
+
+---
+
+# 22. RASP prune ở đâu?
+
+Đây là điểm cực kỳ quan trọng.
+
+**Không phải toàn bộ convolution.**
+
+RASP chỉ tìm standard Bottleneck:
+
+```text
+input C
+   │
+   ▼
+ cv1
+   │
+   ▼
+hidden H    ← RASP prune ở đây
+   │
+   ▼
+ cv2
+   │
+   ▼
+output C
+```
+
+Suppose:
+
+```text
+C = 256
+H = 128
+```
+
+và RASP quyết định bỏ 16 hidden channels.
+
+Training-time:
+
+```text
+cv1 still outputs 128
+↓
+16 channels × gate=0
+↓
+cv2 still physically sees 128-shaped input
+```
+
+Deployment-time:
+
+```text
+cv1 output:
+128 → 112
+
+cv2 input:
+128 → 112
+```
+
+Nhưng:
+
+```text
+block input  C = 256  unchanged
+block output C = 256  unchanged
+```
+
+Vì thế toàn bộ graph bên ngoài block vẫn tương thích. Đây chính là lý do code chọn hidden Bottleneck làm physical pruning unit. 
+
+---
+
+# 23. Training-time RASP Student vẫn là dense latent model
+
+Điểm này dễ nhầm.
+
+Trong 60 epochs:
+
+```text
+stored weights:
+dense
+
+forward computation:
+masked
+```
 
 Ví dụ:
 
 ```text
-batch A:
-car nhiều
-
-batch B:
-person nhiều
-
-batch C:
-gần như không có object
+128 hidden weights vẫn tồn tại trong checkpoint
 ```
 
-Nếu prune dựa vào một batch:
+nhưng forward:
 
-[
-I_g^{(t)}
-]
+```text
+channel 4  → 0
+channel 9  → 0
+channel 27 → 0
+...
+```
 
-thì dễ quyết định sai.
+Forward hook đặt gate ngay sau `cv1`:
 
-Do đó:
+```python
+gate = mask.view(...)
+return output * gate
+```
 
-[
-\bar I_g^{(t)}
-==============
 
-\beta \bar I_g^{(t-1)}
-+
-(1-\beta)I_g^{(t)}
-]
 
-RASP sử dụng accumulated/EMA importance.
-
-Điều này làm pruning decision ổn định hơn.
+Lý do là Teacher và Student vẫn có cùng dense tensor shapes, nên EMA parameter-wise hoạt động trực tiếp.
 
 ---
 
-# 13. Nhưng importance thấp chưa chắc là redundancy
+# 24. Taylor importance
 
-Đây là lý do có GMM.
+Khi Student backward, RASP đo cho mỗi hidden channel:
 
-Giả sử một stage có importance:
+[
+I_c
+===
 
-```text
-0.01
-0.012
-0.015
-0.018
-0.31
-0.37
-0.40
-0.45
+E\left[
+|A_c \cdot \frac{\partial L}{\partial A_c}|
+\right]
+]
+
+Trong code:
+
+```python
+imp = (activation * gradient).abs().mean(...)
 ```
 
-nhìn rất rõ có:
+
+
+Ý nghĩa:
+
+```text
+activation lớn
++
+gradient lớn
+→ channel quan trọng
+```
+
+Ngược lại:
+
+```text
+activation × gradient nhỏ
+→ remove channel đó ít ảnh hưởng loss hơn
+```
+
+Importance được average trong epoch rồi EMA:
+
+[
+I_t
+===
+
+0.9I_{t-1}
++
+0.1I_{new}
+]
+
+
+
+---
+
+# 25. GMM quyết định channel nào thật sự thuộc nhóm thấp
+
+RASP không đơn giản:
+
+```text
+sort importance
+→ lấy 20% thấp nhất
+```
+
+Mỗi Bottleneck tự fit:
+
+```text
+GMM 1-component
+vs
+GMM 2-component
+```
+
+trên:
+
+```text
+log(Taylor importance)
+```
+
+Nếu 2-component hợp lý, nó xác định:
 
 ```text
 low-importance cluster
 high-importance cluster
 ```
 
-Nhưng stage khác:
+Một channel chỉ trở thành candidate khi posterior thuộc low cluster đủ cao.
+
+Main config:
 
 ```text
-0.12
-0.13
-0.14
-0.15
-0.16
-0.17
+posterior ≥ 0.80
+separation ≥ 1.0
+BIC gain ≥ 0
 ```
 
-không có separation rõ.
+Code GMM selection và posterior filtering nằm ở đây. 
 
-Nếu cứ prune bottom 30%:
+Do đó RASP là:
 
 ```text
-cả hai stage đều mất 30%
+adaptive per-block
 ```
 
-→ không hợp lý.
-
-RASP dùng **Gaussian Mixture Model** trên:
-
-[
-x_g=\log(I_g+\epsilon)
-]
+chứ không phải fixed sparsity mỗi layer.
 
 ---
 
-# 14. GMM redundancy discovery
+# 26. Hardware-friendly packs
 
-Với mỗi candidate block/stage, fit:
+RASP không prune từng channel đơn lẻ ở bước apply.
 
-```text
-GMM K=1
-```
-
-và:
+Main setting:
 
 ```text
-GMM K=2
+round_to = 8
 ```
 
-Sau đó compare BIC.
-
-Nếu:
+Do đó:
 
 ```text
-K=1 tốt hơn
+8 channels = 1 pack
 ```
-
-→ không có bằng chứng rõ ràng rằng tồn tại redundant low-importance population.
-
-RASP có thể:
-
-```text
-protect block
-```
-
-Nếu:
-
-```text
-K=2 tốt hơn
-```
-
-→ có hai populations.
-
-Component có mean thấp:
-
-```text
-low-importance component
-```
-
-được xem như redundancy candidate.
-
-Ta có:
-
-[
-P(
-\text{unimportant}
-\mid I_g
-)
-]
-
-Nếu posterior đủ cao:
-
-```text
-group g
-→ eligible pruning candidate
-```
-
-Điều này khác threshold cứng.
-
----
-
-# 15. Vai trò của GMM
-
-Taylor trả lời:
-
-> “Importance bao nhiêu?”
-
-GMM trả lời:
-
-> “Importance thấp này có thật sự tạo thành một redundancy population không?”
-
-Hai bước phối hợp:
-
-```text
-Taylor
-→ sensitivity
-
-GMM
-→ redundancy structure
-```
-
-Nhờ vậy RASP không ép mọi layer phải prune cùng một tỷ lệ.
-
-Có thể xảy ra:
-
-```text
-Stage A → prune nhiều
-Stage B → prune ít
-Stage C → không prune
-Stage D → prune vừa
-```
-
-Đây là tính **adaptive** của method.
-
----
-
-# 16. Sau GMM vẫn chưa prune ngay
-
-Giả sử có hai candidate:
-
-```text
-A:
-importance = 0.02
-saving = 0.1 GFLOPs
-
-B:
-importance = 0.03
-saving = 1.2 GFLOPs
-```
-
-A có importance thấp hơn.
-
-Nhưng B tiết kiệm compute nhiều hơn rất nhiều.
-
-Do đó RASP dùng cost-aware ranking.
-
----
-
-# 17. Cost-aware pruning score
-
-Bạn dùng:
-
-[
-Score_g
-=======
-
-\frac{I_g}
-{(\Delta C_g)^\gamma}
-]
-
-Trong đó:
-
-[
-I_g
-]
-
-= target importance.
-
-[
-\Delta C_g
-]
-
-= compute saving nếu prune group (g).
-
-[
-\gamma
-]
-
-= mức độ ưu tiên efficiency.
-
-Score thấp nghĩa là:
-
-> **mất ít information trên mỗi đơn vị compute tiết kiệm được.**
-
-Vì vậy:
-
-```text
-lower score
-→ better pruning candidate
-```
-
-Đây rất quan trọng vì mục tiêu paper không chỉ là sparsity.
-
-Bạn muốn:
-
-[
-\boxed{
-\text{accuracy–efficiency trade-off}
-}
-]
-
----
-
-# 18. Compute cost được lấy từ đâu?
-
-Ở Phase 1:
-
-```text
-MACs / FLOPs
-```
-
-có thể dùng làm (\Delta C_g).
-
-Audit cung cấp structural cost estimate.
 
 Ví dụ:
 
 ```text
-remove 8 channels ở early high-resolution layer
+candidate channels:
+[3, 17, 18, 22, 31, 35, 40, 44]
+            ↓
+          1 pack
 ```
 
-có thể tiết kiệm nhiều hơn:
+Mục tiêu là width compact thân thiện hơn cho hardware.
 
-```text
-remove 8 channels ở late low-resolution layer
-```
-
-Cho nên channel count alone không đủ.
-
-Ở final experiment, bạn vẫn phải report:
-
-```text
-Params
-FLOPs/MACs
-model size
-actual latency/FPS
-```
-
-vì FLOPs không đồng nghĩa hoàn toàn với wall-clock speed.
+Code gom candidate thành complete packs theo `round_to`. 
 
 ---
 
-# 19. RASP không dùng fixed 30% pruning ratio
+# 27. Cost-aware ranking
 
-Đây là một điểm khác của proposed method.
+RASP không chỉ hỏi:
 
-Các pruning method thông thường có thể đặt:
+> channel nào ít quan trọng?
 
-[
-r = 0.3
-]
+Nó còn hỏi:
 
-và prune 30%.
+> bỏ channel nào tiết kiệm compute nhiều nhất?
 
-RASP không muốn đặt:
+Mỗi hidden channel có estimated saving từ:
 
 ```text
-20%
-30%
-40%
+cv1 output channel
++
+cv2 matching input channel
 ```
 
-bằng tay cho main method.
-
-Thay vào đó nó xây dựng một frontier:
+Bao gồm:
 
 ```text
-candidate 1
-→ little compression / little information loss
+parameter saving
+MAC saving
+```
 
-candidate 2
-→ more compression / more information loss
 
-candidate 3
-→ more compression / more information loss
 
+Score về bản chất là:
+
+[
+score
+\propto
+\frac{\text{importance}}
+{\text{low-GMM confidence}\times\text{compute benefit}^{\gamma}}
+]
+
+Lower score được ưu tiên.
+
+Với:
+
+```text
+γ = 1.0
+```
+
+nên RASP thích:
+
+```text
+low importance
++
+high probability redundant
++
+high MAC saving
+```
+
+
+
+---
+
+# 28. Kneedle tự tìm pruning budget
+
+Sau khi packs được global ranking:
+
+```text
+pack 1
+pack 2
+pack 3
 ...
 ```
 
----
-
-# 20. Compression–information frontier
-
-Sau cost-aware ranking:
+RASP tạo cumulative curve:
 
 ```text
-g1, g2, g3, ..., gn
+X = compute removed
+Y = importance lost
 ```
 
-RASP progressively giả định prune:
+Ví dụ:
 
 ```text
-{g1}
-{g1,g2}
-{g1,g2,g3}
-...
+importance lost
+^
+|                         *
+|                     *
+|                  *
+|               *
+|           *
+|      *
+|   *
+| *
++------------------------------> MACs removed
+               ^
+              knee
 ```
-
-và tính:
-
-[
-x_k=
-\frac{\text{cumulative compute removed}}
-{\text{candidate compute}}
-]
-
-[
-y_k=
-\frac{\text{cumulative importance lost}}
-{\text{candidate importance}}
-]
-
-Ta có curve:
-
-[
-(x_k,y_k)
-]
-
----
-
-# 21. Kneedle chọn adaptive budget
-
-RASP dùng knee/elbow point.
 
 Ý tưởng:
 
-Ban đầu:
-
 ```text
-compression tăng nhanh
-information loss tăng chậm
+trước knee:
+remove thêm compute nhưng mất ít importance
+
+sau knee:
+remove thêm bắt đầu mất importance nhanh
 ```
 
-→ đáng prune.
+Code dùng Kneedle, có max-distance fallback. 
 
-Nhưng sau một điểm:
-
-```text
-muốn thêm một ít compression
-→ phải sacrifice rất nhiều importance
-```
-
-Điểm chuyển đó là:
-
-```text
-knee
-```
-
-RASP dừng ở đó.
-
-Do vậy pruning budget được quyết định từ:
-
-```text
-target-domain importance
-+
-available redundancy
-+
-compute saving
-```
-
-chứ không phải:
-
-```text
-target mAP
-```
-
-hay:
-
-```text
-user-set fixed ratio
-```
-
-Điều này đặc biệt quan trọng trong SFOD vì:
-
-> Foggy validation GT không được phép dùng để chọn pruning ratio.
+Vậy RASP **không cần fixed global target kiểu 30% hay 50%**.
 
 ---
 
-# 22. Tại sao vẫn cần reliability gate?
+# 29. Reliability gate
 
-Ngay cả khi Taylor + GMM + Kneedle nói:
+RASP chỉ được phép prune nếu DHF pseudo-labels đủ đáng tin.
 
-```text
-“nên prune”
-```
-
-thì RASP vẫn hỏi:
-
-> “Teacher hiện tại có đáng tin không?”
-
-Ví dụ đầu adaptation:
+Project dùng:
 
 ```text
-domain gap còn lớn
-Teacher pseudo-label yếu
+mean DHF confidence ≥ 0.50
 ```
 
-Nếu lúc đó prune:
+Và phải:
 
 ```text
-Student capacity ↓
-+
-supervision noisy
+warmup > 5 epochs
 ```
 
-→ nguy hiểm.
+cũng như đủ recovery interval:
 
-Do đó RASP có **reliability-aware gate**.
+```text
+3 epochs giữa pruning events
+```
+
+Controller kiểm tra ba điều kiện:
+
+```text
+warmup done
+AND
+recovery interval done
+AND
+reliability high enough
+```
+
+
+
+Vì vậy logic là:
+
+```text
+Teacher đang không chắc
+→ đừng cắt capacity
+
+Teacher đủ đáng tin
+→ có thể prune
+```
 
 ---
 
-# 23. Reliability signal
+# 30. Step cap
 
-Reliability có thể dựa trên Teacher/DHF statistics như:
+Ngay cả khi Kneedle nói có thể prune rất nhiều, RASP không cắt hết ngay một lần.
 
-```text
-average accepted pseudo-label confidence
-pseudo-label count
-DHF quality/stability
-zero-pseudo rate
-```
-
-Ví dụ đơn giản:
-
-[
-R_t =
-\text{mean confidence of accepted pseudo labels}
-]
-
-Nếu:
-
-[
-R_t < \tau_R
-]
-
-thì:
+Main setting:
 
 ```text
-NO NEW PRUNING
+max new cost/event
+=
+5% baseline prunable MACs
 ```
-
-Student vẫn train và giữ masks hiện tại.
-
-Nếu:
-
-[
-R_t \ge \tau_R
-]
-
-thì mới cho controller activate pruning.
-
-Current natural threshold khoảng:
-
-[
-\tau_R \approx 0.5
-]
-
-phù hợp với DHF confidence threshold.
-
----
-
-# 24. Vì sao gọi là Reliability-Aware?
-
-Đây chính là chữ **RA** trong RASP.
-
-Pruning decision không chỉ dựa trên structural criterion.
-
-Nó còn phụ thuộc:
-
-[
-\text{Teacher reliability at time }t
-]
 
 Nên:
 
 ```text
-same Student
-same importance distribution
-```
-
-nhưng:
-
-```text
-Teacher unreliable
-→ postpone pruning
-
-Teacher reliable
-→ allow pruning
-```
-
-Điều này phù hợp đặc biệt với source-free self-training.
-
----
-
-# 25. Structured Pruning là chữ SP
-
-**SP = Structured Pruning**
-
-Method không tạo sparse random weights.
-
-Nó loại:
-
-```text
-channels
-dependency-consistent channel groups
-```
-
-để cuối cùng có thể compact graph thật.
-
-Do đó tên:
-
-[
-\boxed{
-\text{RASP}
-===========
-
-\text{Reliability-Aware Structured Pruning}
-}
-]
-
----
-
-# 26. Progressive pruning
-
-RASP không prune toàn bộ một lần.
-
-Thay vào đó:
-
-```text
-warmup
+prune
 ↓
-estimate importance
-↓
-discover redundancy
-↓
-prune a set
-↓
-continue adaptation
-↓
-recover
+train / recover
 ↓
 re-estimate importance
 ↓
-next pruning decision
+prune tiếp
 ```
 
-Có thể biểu diễn:
-
-[
-S_0
-\rightarrow
-S_1
-\rightarrow
-S_2
-\rightarrow
-...
-\rightarrow
-S_K
-]
-
-trong đó:
-
-[
-S_{k+1}\subseteq S_k
-]
-
-về active channels.
-
-Masks là monotonic:
+thay vì:
 
 ```text
-once pruned
-→ remain pruned
+prune rất mạnh một phát
 ```
 
-trong main design.
+Controller áp dụng step cap này sau knee selection. 
 
 ---
 
-# 27. Tại sao cần recovery phase?
+# 31. RASP topology đầy đủ
 
-Sau khi prune:
-
-```text
-representation bị perturb
-```
-
-Student có thể giảm accuracy tạm thời.
-
-Nhưng thay vì:
+Toàn bộ proposed architecture có thể vẽ thế này:
 
 ```text
-prune
-↓
-separate supervised fine-tuning
+                            Foggy image
+                                 │
+                       ┌─────────┴─────────┐
+                       │                   │
+                       ▼                   ▼
+                   weak view          strong view
+                       │                   │
+                       ▼                   ▼
+              ┌────────────────┐   ┌────────────────┐
+              │ Dense Teacher  │   │ RASP Student   │
+              │   YOLO26-M     │   │   YOLO26-M     │
+              └───────┬────────┘   └───────┬────────┘
+                      │                    │
+               ┌──────┴──────┐             │
+               ▼             ▼             │
+              O2O           O2M            │
+               │             │             │
+               └──────┬──────┘             │
+                      ▼                    │
+                     DHF                   │
+                      │                    │
+               pseudo labels              │
+                      │                    │
+                      ▼                    │
+              geometric mapping           │
+                      │                    │
+                      └──────────┬─────────┘
+                                 ▼
+                         Student YOLO loss
+                                 +
+                               MARD
+                                 │
+                                 ▼
+                            total loss
+                                 │
+                              backward
+                                 │
+                ┌────────────────┴───────────────┐
+                │                                │
+                ▼                                ▼
+         optimize Student                Taylor |A × grad|
+                                                 │
+                                                 ▼
+                                         importance EMA
+                                                 │
+                                                 ▼
+                                           per-block GMM
+                                                 │
+                                                 ▼
+                                         low-importance
+                                           candidates
+                                                 │
+                                                 ▼
+                                         pack channels ×8
+                                                 │
+                                                 ▼
+                                         cost-aware ranking
+                                                 │
+                                                 ▼
+                                             Kneedle
+                                                 │
+                                                 ▼
+                                      reliability + step gate
+                                                 │
+                                                 ▼
+                                        monotonic masks
+                                                 │
+                                                 ▼
+                                         next training epoch
+
+epoch end:
+Student dense latent weights
+           │
+           ▼
+      EMA 0.999
+           │
+           ▼
+    Dense Teacher
 ```
-
-RASP tận dụng chính:
-
-```text
-RT-SFOD adaptation
-+
-MARD
-```
-
-để recover.
-
-Tức là:
-
-[
-\boxed{
-\text{adaptation itself becomes pruning recovery}
-}
-]
-
-Đây là một trong những hypothesis quan trọng nhất của proposed method.
 
 ---
 
-# 28. Đây cũng là lý do experiment “in-loop vs post-pruning” rất quan trọng
+# 32. Physical compact export
 
-Bạn nên có:
-
-```text
-A. Dense RT-SFOD
-```
+Sau 60 epochs mới biến:
 
 ```text
-B. Dense RT-SFOD
-   ↓
-   train complete
-   ↓
-   prune afterward
+masked dense Student
 ```
 
-và:
+thành:
 
 ```text
-C. RASP-SFOD
-   ↓
-   prune during adaptation
-   ↓
-   recovery happens naturally
+physically smaller Student
 ```
 
-B và C phải matched compactness càng gần càng tốt.
+Giả sử mask:
 
-Nếu:
+```text
+H = 128
+keep = 112
+```
 
-[
-mAP_C > mAP_B
-]
+Exporter làm:
 
-ở cùng Params/FLOPs,
+```text
+cv1:
+weight[keep]
+output channels 128 → 112
 
-thì có evidence rằng:
+BN after cv1:
+weight[keep]
+bias[keep]
+running_mean[keep]
+running_var[keep]
 
-> **Joint adaptation and pruning is better than post-hoc pruning.**
+cv2:
+weight[:, keep]
+input channels 128 → 112
+```
 
-Đây là experiment rất có giá trị cho paper.
+Code thực hiện chính xác việc slice `cv1`, BN và `cv2`. 
+
+External block width vẫn không đổi:
+
+```text
+C → H' → C
+```
+
+thay vì:
+
+```text
+C → H → C
+```
 
 ---
 
-# 29. Một iteration RASP có thể hiểu như thế này
+# 33. Vì vậy compact model vẫn giữ nguyên toàn bộ outer YOLO architecture
 
-Giả sử hiện tại là epoch (t).
-
-Teacher nhận weak Foggy image:
-
-[
-x_t^w
-]
-
-và tạo DHF pseudo labels:
-
-[
-\hat y_t
-]
-
-Student nhận strong view:
-
-[
-x_t^s
-]
-
-Student tối ưu:
-
-[
-L_{\text{SFOD}}
-===============
-
-L_{\text{det}}
-(x_t^s,\hat y_t)
-+
-\lambda_M L_{\text{MARD}}
-]
-
-Từ backward, RASP cập nhật:
-
-[
-I_g
-===
-
-EMA
-\left[
-\left|
-z_g
-\frac{\partial L_{\text{SFOD}}}
-{\partial z_g}
-\right|
-\right]
-]
-
-Khi tới pruning decision point:
+Sau compact:
 
 ```text
-importance
-↓
-log transform
-↓
-GMM K=1 vs K=2
-↓
-redundancy candidates
-↓
-dependency/cost info
-↓
-Score = I / cost^γ
-↓
-rank
-↓
-compression-information curve
-↓
-Kneedle
-↓
-candidate pruning set
+Backbone topology      unchanged
+PAN topology           unchanged
+P3/P4/P5 width         unchanged
+Detect input width     unchanged
+O2O head               unchanged
+O2M head               unchanged
+number of classes      unchanged
+MARD interface         unchanged
 ```
 
-Sau đó reliability gate:
+Chỉ một số:
 
 ```text
-Teacher reliable?
+internal Bottleneck hidden widths
 ```
 
-Nếu không:
+nhỏ đi.
 
-```text
-pruning proposal rejected/postponed
-```
-
-Nếu có:
-
-```text
-activate masks
-```
-
-rồi tiếp tục training.
+Đó là lý do physical export khá an toàn.
 
 ---
 
-# 30. Một ví dụ rất trực quan
+# 34. Pruning space thực tế của model
 
-Giả sử audit phát hiện 100 pruning groups.
-
-Sau warmup:
+Audit của main YOLO26-M tìm thấy:
 
 ```text
-Taylor importance computed for 100 groups
+eligible Bottleneck groups = 15
+eligible hidden channels   = 1472
+DepGraph safe              = 15 / 15
 ```
 
-GMM tìm ra:
+
+
+Tức RASP không kiểm soát toàn bộ 21.785M parameters.
+
+Nó chỉ kiểm soát một subset bên trong 15 Bottleneck.
+
+Đây cũng giải thích tại sao kết quả cuối là:
 
 ```text
-35 groups
+Dense:
+21.785M params
+
+Compact:
+21.255M params
+
+reduction:
+2.44%
 ```
 
-thuộc low-importance components.
-
-Cost-aware ranking sắp:
-
-```text
-g17
-g42
-g8
-g90
-...
-```
-
-Kneedle cho rằng tốt nhất chỉ prune:
-
-```text
-top 14 candidate groups
-```
-
-vì từ group thứ 15 trở đi information cost tăng mạnh.
-
-Nhưng epoch đó Teacher reliability:
-
-[
-R_t=0.44
-]
-
-threshold:
-
-[
-0.5
-]
-
-RASP:
-
-```text
-DO NOT PRUNE
-```
-
-Vài epoch sau:
-
-[
-R_t=0.71
-]
-
-Taylor/GMM được recompute.
-
-Lần này Kneedle chọn:
-
-```text
-12 groups
-```
-
-RASP mới activate masks.
-
-Sau đó Student tiếp tục RT-SFOD để recover.
+chứ không phải 20–30%.
 
 ---
 
-# 31. Tại sao recompute importance sau pruning?
+# 35. Architecture final
 
-Bởi vì importance là **context-dependent**.
-
-Trước pruning:
+Model cuối cùng:
 
 ```text
-channel A và B có thể redundant nhau
-```
-
-sau khi prune A:
-
-```text
-B có thể trở nên rất quan trọng
-```
-
-Nếu dùng importance ban đầu mãi:
-
-```text
-A low
-B low
-→ prune both
-```
-
-có thể phá model.
-
-Cho nên:
-
-```text
-prune
-↓
-recover
-↓
-recompute
-```
-
-là thiết kế đúng hơn.
-
----
-
-# 32. O2O detached có ảnh hưởng gì tới Taylor?
-
-YOLO26 end-to-end head có O2O branch dùng detached features.
-
-Do đó gradient O2O không propagate giống O2M về backbone.
-
-Vì vậy backbone Taylor importance trong RASP chủ yếu phản ánh:
-
-```text
-O2M detection supervision
-+
-MARD gradients
-```
-
-Điều này không phải bug.
-
-Đó là hệ quả của architecture.
-
-Và đây cũng là lý do MARD khá hữu ích đối với RASP:
-
-> Nó cung cấp thêm target-domain representation signal tới backbone/PAN.
-
----
-
-# 33. Tại sao không prune Detect head?
-
-Prediction head có rất nhiều dependency nhạy cảm:
-
-```text
-class channels
-bbox regression dimensions
-one-to-one branch
-one-to-many branch
-```
-
-Prune prediction channel trực tiếp có thể thay đổi semantic output dimension.
-
-Ví dụ:
-
-```text
+YOLO26-M
 8 classes
-```
+end-to-end
+dual assignment head
+P3/P4/P5 detector
 
-không thể tùy tiện xóa class output channel chỉ vì Taylor thấp.
-
-Do đó initial safe search space ưu tiên:
-
-```text
-backbone
 +
-neck/PAN
-```
 
-và bảo vệ:
+RT-SFOD:
+Mean Teacher
+DHF
+MARD
 
-```text
-Detect output structures
-```
-
----
-
-# 34. Masked model chưa phải compact model
-
-Điểm này cần cực kỳ rõ khi viết paper.
-
-Sau 60 epochs:
-
-```text
-Student vẫn có original tensor shapes
-```
-
-dù một số channels có:
-
-```text
-mask = 0
-```
-
-Nếu chỉ tính:
-
-```python
-sum(p.numel())
-```
-
-thì Params vẫn gần như không đổi.
-
-Do đó bạn **không được claim actual parameter reduction** dựa trên masked Student.
-
----
-
-# 35. Physical compaction ở cuối
-
-Sau adaptation:
-
-```text
-final masks
-↓
-keep indices
-↓
-rewrite graph
-```
-
-Ví dụ:
-
-```text
-Conv A:
-out_channels 256
-```
-
-mask giữ:
-
-```text
-192 channels
-```
-
-thì compact model:
-
-```text
-Conv A
-256 → 192
-```
-
-BN:
-
-```text
-256 → 192
-```
-
-next Conv input:
-
-```text
-256 → 192
-```
-
-tất cả dependency phải slice cùng index.
-
-Sau đó kiểm tra:
-
-[
-f_{\text{masked-dense}}(x)
-\approx
-f_{\text{compact}}(x)
-]
-
-Sai số phải rất nhỏ.
-
-Smoke test trước đây của framework đã đạt kiểu:
-
-```text
-masked_vs_compact_max_abs_diff = 0
-```
-
-cho supported pattern.
-
----
-
-# 36. Chỉ sau compaction mới report compression thật
-
-Final compact artifact mới được dùng để tính:
-
-[
-\text{Params}
-]
-
-[
-\text{FLOPs / MACs}
-]
-
-[
-\text{model size}
-]
-
-[
-\text{latency}
-]
-
-[
-\text{FPS}
-]
-
-và cuối cùng target-domain accuracy:
-
-[
-mAP@0.5
-]
-
-[
-mAP@0.5:0.95
-]
-
----
-
-# 37. RASP không dùng target labels để quyết định pruning
-
-Đây là requirement cực kỳ quan trọng.
-
-Không được dùng Foggy val GT để chọn:
-
-```text
-pruning ratio
-Kneedle point
-GMM threshold
-epoch
-reliability threshold
-best compactness
-```
-
-Adaptation chỉ dùng:
-
-```text
-Foggy train images
 +
-Teacher pseudo labels
-+
-internal statistics
-```
-
-Foggy val labels chỉ dùng:
-
-```text
-AFTER model is frozen
-→ final benchmark evaluation
-```
-
-Như vậy mới giữ đúng source-free protocol.
-
----
-
-# 38. Những thành phần adaptive của RASP
-
-Có thể xem RASP trả lời 5 câu hỏi:
-
-| Question                       | Component                            |
-| ------------------------------ | ------------------------------------ |
-| **Prune ở đâu?**               | graph audit + safe dependency groups |
-| **Channel nào ít quan trọng?** | target-aware Taylor                  |
-| **Có redundancy thật không?**  | GMM                                  |
-| **Prune cái nào có lợi nhất?** | cost-aware ranking                   |
-| **Prune bao nhiêu?**           | Kneedle                              |
-| **Prune lúc nào?**             | Teacher reliability gate             |
-
-Đây là cách rất hay để trình bày method trong presentation/paper.
-
----
-
-# 39. Điểm khác biệt so với conventional pruning
-
-Conventional pipeline:
-
-```text
-train
-↓
-prune fixed 30%
-↓
-fine-tune
-```
 
 RASP:
+Student-only
+hidden Bottleneck structured pruning
+target Taylor importance
+per-block GMM
+cost-aware ranking
+Kneedle budget
+DHF reliability gate
+recovery cycles
 
-```text
-source-free adaptation
-        ↕
-importance estimation
-        ↕
-redundancy discovery
-        ↕
-budget discovery
-        ↕
-reliability control
-        ↕
-progressive pruning
-```
-
-Tức là compression **co-evolves with adaptation**.
-
----
-
-# 40. Điểm khác biệt so với magnitude pruning
-
-Magnitude pruning:
-
-[
-I_g=|W_g|
-]
-
-RASP:
-
-[
-I_g
-===
-
-EMA
-\left[
-\left|
-z_g
-\frac{\partial L_{SFOD}}{\partial z_g}
-\right|
-\right]
-]
-
-Magnitude hỏi:
-
-> weight nhỏ không?
-
-RASP hỏi:
-
-> channel này có đóng góp vào target adaptation hiện tại không?
-
-Đây là khác biệt conceptually rất lớn.
-
----
-
-# 41. Điểm khác biệt so với fixed Taylor pruning
-
-Ngay cả Taylor pruning thường vẫn làm:
-
-```text
-rank all channels
-↓
-prune fixed 30%
-```
-
-RASP thêm:
-
-```text
-GMM
-→ xác định redundancy
-
-cost-aware
-→ efficiency-aware selection
-
-Kneedle
-→ automatic budget
-
-reliability gate
-→ timing control
-```
-
-Nên Taylor chỉ là **một signal trong controller**, không phải toàn bộ proposed method.
-
----
-
-# 42. Ý nghĩa của “target-adaptive”
-
-RASP adaptive theo cả:
-
-```text
-domain
-```
-
-và:
-
-```text
-training state
-```
-
-Ví dụ một group:
-
-```text
-important ở Clear Cityscapes
-```
-
-nhưng:
-
-```text
-redundant trên Foggy
-```
-
-thì RASP có thể prune.
-
-Ngược lại:
-
-```text
-weight magnitude nhỏ
-```
-
-nhưng Foggy gradients cho thấy nó rất quan trọng:
-
-[
-I_g \text{ lớn}
-]
-
-→ giữ lại.
-
-Đó là target-adaptive pruning.
-
----
-
-# 43. Ý nghĩa khoa học lớn nhất của method
-
-Hypothesis trung tâm của bạn có thể diễn đạt:
-
-> Domain adaptation itself changes the functional importance of channels; therefore, model compression for SFOD should be decided using target-domain adaptation signals rather than source-domain or static weight statistics.
-
-Và hypothesis thứ hai:
-
-> Compression should be introduced progressively while the Student is still adapting, so self-training and representation regularization can recover pruning-induced degradation.
-
-Hypothesis thứ ba:
-
-> Pruning decisions should be conditioned on pseudo-label reliability because structural capacity reduction is particularly risky when self-training supervision is unreliable.
-
-Ba câu này gần như là backbone lý luận của paper.
-
----
-
-# 44. Main contributions có thể đóng khung như thế nào
-
-Không nên claim quá sớm “first ever”, nhưng contribution logic hiện tại có thể là:
-
-**Target-aware importance.**
-
-RASP uses target-domain SFOD gradients to estimate structured channel sensitivity instead of relying on source data or static weight magnitude.
-
-**Probabilistic redundancy discovery.**
-
-Rather than enforcing a fixed pruning ratio, RASP models importance distributions using GMMs to identify whether a low-importance population is actually present.
-
-**Adaptive efficiency-aware budget.**
-
-Candidate groups are ranked by information loss relative to compute saving, while Kneedle determines the pruning frontier without target labels.
-
-**Reliability-aware progressive compression.**
-
-Pruning is permitted only when Teacher/DHF pseudo supervision is sufficiently reliable, followed by continued RT-SFOD/MARD adaptation for recovery.
-
----
-
-# 45. Ablation nào chứng minh từng component?
-
-Full RASP phải so với:
-
-```text
-Dense RT-SFOD
-```
-
-để chứng minh compression.
-
-So với:
-
-```text
-post-adaptation pruning
-```
-
-để chứng minh in-loop recovery.
-
-So với:
-
-```text
-fixed-budget Taylor
-```
-
-để chứng minh adaptive budget.
-
-So:
-
-```text
-GMM vs Otsu
-```
-
-để chứng minh probabilistic redundancy detection.
-
-Có thể thêm:
-
-```text
-RASP without reliability gate
-```
-
-để chứng minh gate.
-
-Nếu full RASP:
-
-```text
-accuracy gần dense
 +
-Params ↓
-+
-FLOPs ↓
-+
-latency ↓
+
+physical hidden-channel compaction
 ```
 
-thì main objective đạt.
-
----
-
-# 46. Main expected outcome
-
-Ví dụ final table lý tưởng:
-
-| Method               |     mAP50 ↑ | mAP50-95 ↑ |  Params ↓ |   FLOPs ↓ | FPS ↑ |
-| -------------------- | ----------: | ---------: | --------: | --------: | ----: |
-| Source-only YOLO26-M |           x |          x |     21.8M |     74.8G |     x |
-| AdaBN                |           x |          x |     21.8M |     74.8G |     x |
-| RT-SFOD-Y26          |    **48.x** |          x |     21.8M |     74.8G |     x |
-| Post-pruned RT-SFOD  |        46.x |          x |     16.xM |     55.xG |     x |
-| **RASP-SFOD-Y26**    | **47–48.x** |          x | **16.xM** | **55.xG** | **↑** |
-
-Những số trên chỉ minh họa logic, **không phải expected result được phép báo trước**.
-
-Mục tiêu thực nghiệm hợp lý là:
-
-[
-\text{significant compression}
-]
-
-với:
-
-[
-\Delta mAP_{50}
-]
-
-nhỏ, lý tưởng dưới khoảng 1–1.5 điểm so với dense RT-SFOD ở matched protocol.
-
----
-
-# 47. Một câu mô tả proposed method hoàn chỉnh
-
-Nếu viết abstract/method overview, phiên bản an toàn là:
-
-> **We propose RASP-SFOD, a reliability-aware structured pruning framework for source-free object detection that integrates target-domain compression directly into Mean-Teacher adaptation. RASP estimates structured channel sensitivity from target-domain SFOD gradients, identifies redundant channel populations using probabilistic mixture modeling, ranks pruning candidates according to information loss relative to computational saving, automatically selects a compression frontier using knee-point detection, and activates pruning only when Teacher pseudo-labels are sufficiently reliable. The Student is progressively masked during adaptation while the dense Teacher remains shape-compatible through EMA, allowing continued RT-SFOD and MARD optimization to recover pruning-induced degradation. Physical graph compaction is performed only after adaptation to obtain actual reductions in parameters, FLOPs, model size, and inference latency.**
-
----
-
-# 48. Nếu nói cực ngắn để giải thích cho giáo viên/reviewer
-
-Bạn có thể nói:
-
-> “RT-SFOD giúp YOLO26-M thích nghi từ Clear Cityscapes sang Foggy Cityscapes mà không dùng target labels. Tôi mở rộng framework này bằng cách nén Student ngay trong quá trình adaptation. Thay vì đặt trước pruning ratio, tôi dùng gradient trên target domain để đo channel importance, GMM để xác định nhóm redundant, compute cost để ưu tiên channel mang lại saving tốt, Kneedle để tự chọn mức prune, và Teacher confidence để quyết định thời điểm prune. Sau mỗi pruning step, Student tiếp tục RT-SFOD + MARD để recover. Teacher vẫn dense để giữ pseudo-label ổn định, và chỉ cuối cùng mới compact graph thật để đo Params/FLOPs/FPS.”
-
----
-
-# 49. Cách tôi muốn bạn hình dung RASP
-
-Không nên hình dung nó là:
+Final architecture có:
 
 ```text
-RT-SFOD
-+
-pruning algorithm
+21.255M parameters
+5.683G MACs @ 256
 ```
 
-mà nên hình dung là một **compression controller nằm bên cạnh Student**:
+so với dense:
 
 ```text
-                  ┌─────────────────────┐
-                  │    Dense Teacher    │
-                  │   EMA parameters    │
-                  └──────────┬──────────┘
-                             │
-                         DHF pseudo
-                             │
-                             ▼
-Target image ───────→ ┌───────────────┐
-                      │    Student    │
-                      │   YOLO26-M    │
-                      └───────┬───────┘
-                              │
-                       SFOD + MARD loss
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │ RASP Controller   │
-                    │                   │
-                    │ Taylor importance │
-                    │       ↓           │
-                    │ GMM redundancy    │
-                    │       ↓           │
-                    │ Cost ranking      │
-                    │       ↓           │
-                    │ Kneedle budget    │
-                    │       ↓           │
-Teacher reliability ─→ Reliability gate│
-                    │       ↓           │
-                    │ Channel masks     │
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                      compressed Student
-                              │
-                       continued recovery
-                              │
-                              ▼
-                       compact export
+21.785M parameters
+5.957G MACs @ 256
 ```
+
+và final Foggy result:
+
+```text
+Dense RT-SFOD:
+mAP50    51.30
+mAP50-95 33.52
+
+RASP compact:
+mAP50    50.90
+mAP50-95 32.70
+```
+
+---
+
+# 36. Những architecture trong repo nhưng KHÔNG phải main experiment này
+
+Để không bị lẫn khi nhìn folder code:
+
+| Thành phần         | Main experiment hiện tại? | Ghi chú                       |
+| ------------------ | ------------------------- | ----------------------------- |
+| **YOLO26-M**       | ✅                         | Base detector                 |
+| C3k2 backbone      | ✅                         | Base YOLO26-M                 |
+| P3/P4/P5 PAN       | ✅                         | Multi-scale neck              |
+| O2O + O2M Detect   | ✅                         | Cần cho DHF                   |
+| Mean Teacher       | ✅                         | RT-SFOD                       |
+| DHF                | ✅                         | Pseudo-label fusion           |
+| MARD               | ✅                         | Feature regularization        |
+| **RASP**           | ✅                         | Proposed compression          |
+| YOLO26-Lite        | ❌                         | Không dùng trong main result  |
+| C2fFaster / PConv  | ❌                         | Thuộc nhánh Lite              |
+| Segment26          | ❌                         | Không phải C2F detection main |
+| Mask-DHF           | ❌                         | Segmentation branch           |
+| CARD               | ❌                         | Không phải RASP main          |
+| QAT / quantization | ❌                         | Không dùng trong RASP v1      |
+
+RASP code thậm chí ghi rõ module này **không chứa quantization**. 
+
+---
+
+## Nếu tóm gọn architecture của luận văn trong một hình
+
+```text
+                 TARGET FOGGY IMAGE
+                        │
+            ┌───────────┴───────────┐
+            │                       │
+         Weak Aug                Strong Aug
+            │                       │
+            ▼                       ▼
+   ┌─────────────────┐     ┌────────────────────┐
+   │ Dense YOLO26-M  │     │   YOLO26-M Student│
+   │     Teacher     │     │ + RASP hidden gates│
+   └────────┬────────┘     └──────────┬─────────┘
+            │                         │
+        O2O + O2M                     │
+            │                         │
+            ▼                         │
+           DHF                        │
+            │                         │
+       Pseudo Labels ───────────────► YOLO Loss
+                                      │
+                           P3/P4/P5 ─►MARD
+                                      │
+                                      ▼
+                                  Total Loss
+                                      │
+                                   backward
+                                      │
+                         ┌────────────┴────────────┐
+                         ▼                         ▼
+                   Student update          Taylor Importance
+                                                   │
+                                                   ▼
+                                          GMM → Cost Rank
+                                                   │
+                                                   ▼
+                                               Kneedle
+                                                   │
+                                                   ▼
+                                              RASP Masks
+
+                  Student dense latent parameters
+                                │
+                         EMA once/epoch
+                                │
+                                ▼
+                         Dense Teacher
+
+After 60 epochs:
+RASP masks
+    │
+    ▼
+physical Bottleneck compaction
+    │
+    ▼
+YOLO26-M RASP COMPACT
+```
+
+**Tóm lại:** architecture đã dùng là **YOLO26-M end-to-end dual-head detector đặt trong RT-SFOD Mean-Teacher framework, với DHF tạo pseudo-label, MARD regularize P3/P4/P5, và RASP chỉ prune có cấu trúc các hidden channels bên trong dependency-safe Bottleneck của Student, sau đó physical compact để tạo detector nhỏ hơn.**

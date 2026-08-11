@@ -54,8 +54,7 @@ from ultralytics import YOLO  # noqa: E402  (requires ultralytics/data/ to be pa
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Source-supervised training for city or polyp domains, detect or segment")
-    parser.add_argument("--model-cfg", type=str, default=None, help="Model YAML used only when --weights is not supplied")
-    parser.add_argument("--weights", type=str, default=None, help="Pretrained checkpoint, e.g. yolo26m.pt")
+    parser.add_argument("--model-cfg", type=str, required=True, help="Model YAML, e.g. yolo26-lite.yaml or yolo26-lite-seg.yaml")
     parser.add_argument("--data", type=str, required=True, help="Dataset YAML (e.g. from polyp_kvasir_to_yolo.py)")
     parser.add_argument("--task", type=str, choices=["detect", "segment"], required=True)
     parser.add_argument("--epochs", type=int, default=100)
@@ -69,19 +68,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    out_dir = Path(args.out_dir).resolve()
+    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.weights:
-        print(f"[train_source_supervised] pretrained weights={args.weights}")
-        model = YOLO(args.weights, task=args.task)
-    elif args.model_cfg:
-        print(f"[train_source_supervised] WARNING: building from YAML / scratch: {args.model_cfg}")
-        model = YOLO(args.model_cfg, task=args.task)
-    else:
-        raise ValueError("Provide either --weights or --model-cfg")
-
-    print(f"[train_source_supervised] task={args.task} data={args.data}")
+    print(f"[train_source_supervised] model_cfg={args.model_cfg} task={args.task} data={args.data}")
+    model = YOLO(args.model_cfg, task=args.task)
     model.train(
         data=args.data,
         epochs=args.epochs,
