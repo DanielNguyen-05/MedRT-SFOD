@@ -17,7 +17,10 @@ def main():
     ap.add_argument('--device', default='0')
     ap.add_argument('--seed', type=int, default=29)
     ap.add_argument('--optimizer', default='auto')
-    ap.add_argument('--project', default='runs/seg/source')
+    ap.add_argument(
+        '--project',
+        default=str(Path(__file__).resolve().parents[3] / 'runs' / 'seg' / 'source')
+    )
     ap.add_argument('--name', default='kvasir_yolo26s_seg')
     ap.add_argument('--smoke', action='store_true')
     args = ap.parse_args()

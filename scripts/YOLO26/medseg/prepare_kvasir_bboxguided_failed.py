@@ -352,7 +352,6 @@ def prepare_split(
         "empty_masks": 0,
         "direct": 0,
         "bbox_guided": 0,
-        "bbox_count_mismatch": 0,
     }
 
     for stem in ids:
@@ -406,24 +405,30 @@ def prepare_split(
                 f"No bbox instances for {stem}"
             )
 
-        # Segmentation masks are the source of truth.
-        # Do NOT force polygon count to match Kvasir bbox annotations:
-        # the bbox file contains some degenerate/noisy boxes.
-        rows = direct_mask_polygons(
+        direct_rows = direct_mask_polygons(
             binary01,
             min_contour_area,
         )
 
-        if not rows:
-            raise RuntimeError(
-                f"{stem}: no valid segmentation polygon"
+        if len(direct_rows) == len(boxes):
+            rows = direct_rows
+            stats["direct"] += 1
+
+        else:
+            rows = bbox_guided_polygons(
+                binary01,
+                boxes,
+                min_contour_area,
             )
 
-        stats["direct"] += 1
+            stats["bbox_guided"] += 1
 
-        # BBoxes are used only as an audit signal.
         if len(rows) != len(boxes):
-            stats["bbox_count_mismatch"] += 1
+            raise RuntimeError(
+                f"{stem}: "
+                f"bbox={len(boxes)}, "
+                f"polygon={len(rows)}"
+            )
 
         (
             label_out
