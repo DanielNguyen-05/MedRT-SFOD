@@ -1,4 +1,4 @@
-# MedRT-SFOD / RASP-SFOD — Hướng dẫn chạy project hoàn chỉnh
+# RASPT-SFOD / -SFOD — Hướng dẫn chạy project hoàn chỉnh
 
 > **Project root:** `~/MedRT-SFOD`  
 > **Task:** Source-Free Object Detection — Cityscapes → Foggy Cityscapes  
