@@ -1,0 +1,9 @@
+
+# KVASIR-SEG -> YOLO26-SEG
+
+paired       : 1000
+train        : 800 {'images': 800, 'instances': 847, 'empty_masks': 0, 'direct': 800, 'bbox_guided': 0, 'bbox_count_mismatch': 8}
+val          : 200 {'images': 200, 'instances': 216, 'empty_masks': 0, 'direct': 200, 'bbox_guided': 0, 'bbox_count_mismatch': 0}
+seed         : 29
+dataset yaml : dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml
+[PASS] dataset prepared

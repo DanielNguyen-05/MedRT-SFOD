@@ -1,0 +1,53 @@
+nohup: ignoring input
+========================================================================
+STAGE 1 — YOLO26-S-SEG AdaBN
+========================================================================
+weights       : /home/dang/MedRT-SFOD/runs/seg/source/frozen/kvasir_yolo26s_seg_source_best.pt
+target images : /home/dang/MedRT-SFOD/dataset/CVC-ClinicDB-YOLO26/images/target
+output        : /home/dang/MedRT-SFOD/runs/seg/stage1/cvc_adabn/yolo26s_seg_cvc_adabn.pt
+device        : cuda:0
+imgsz         : 640
+batch         : 8
+epochs        : 2
+flip_prob     : 0.5
+seed          : 29
+
+[Protocol]
+  target labels loaded : NO
+  target masks loaded  : NO
+  loss                 : NO
+  backward             : NO
+  optimizer            : NO
+  BN running stats     : UPDATE
+
+target image count: 612
+
+[Load] source checkpoint
+BatchNorm layers: 134
+trainable parameters: 0
+
+[AdaBN] start
+[Epoch 1/2] batch=1/77 seen=8/612 shape=(8, 3, 480, 640)
+[Epoch 1/2] batch=20/77 seen=160/612 shape=(8, 3, 480, 640)
+[Epoch 1/2] batch=40/77 seen=320/612 shape=(8, 3, 480, 640)
+[Epoch 1/2] batch=60/77 seen=480/612 shape=(8, 3, 480, 640)
+[Epoch 1/2] batch=77/77 seen=612/612 shape=(4, 3, 480, 640)
+[Epoch 1] images=612 time=6.67s
+[Epoch 2/2] batch=1/77 seen=8/612 shape=(8, 3, 480, 640)
+[Epoch 2/2] batch=20/77 seen=160/612 shape=(8, 3, 480, 640)
+[Epoch 2/2] batch=40/77 seen=320/612 shape=(8, 3, 480, 640)
+[Epoch 2/2] batch=60/77 seen=480/612 shape=(8, 3, 480, 640)
+[Epoch 2/2] batch=77/77 seen=612/612 shape=(4, 3, 480, 640)
+[Epoch 2] images=612 time=5.94s
+
+[BN delta]
+bn_layers: 134
+changed_bn_layers: 132
+mean_abs_running_mean_delta: 0.0178785194888704
+mean_abs_running_var_delta: 0.42475323957967076
+
+========================================================================
+[PASS] Stage-1 AdaBN completed
+========================================================================
+checkpoint: /home/dang/MedRT-SFOD/runs/seg/stage1/cvc_adabn/yolo26s_seg_cvc_adabn.pt
+metadata  : /home/dang/MedRT-SFOD/runs/seg/stage1/cvc_adabn/adabn_metadata.json

@@ -1,0 +1,43 @@
+==============================================================================
+RASP-SFSEG STRUCTURAL AUDIT
+==============================================================================
+model       : /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt
+model class : SegmentationModel
+head class  : Segment26
+end2end     : True
+nc          : 1
+nm          : 32
+npr         : 128
+
+eligible groups   : 13
+eligible channels : 880
+
+group                                                     H min_keep  max_rm          HxW
+--------------------------------------------------------------------------------------------
+model.2.m.0                                              16       16       0      160x160
+model.4.m.0                                              32       16      16        80x80
+model.6.m.0.m.0                                          64       32      32        40x40
+model.6.m.0.m.1                                          64       32      32        40x40
+model.8.m.0.m.0                                         128       64      64        20x20
+model.8.m.0.m.1                                         128       64      64        20x20
+model.13.m.0.m.0                                         64       32      32        40x40
+model.13.m.0.m.1                                         64       32      32        40x40
+model.16.m.0.m.0                                         32       16      16        80x80
+model.16.m.0.m.1                                         32       16      16        80x80
+model.19.m.0.m.0                                         64       32      32        40x40
+model.19.m.0.m.1                                         64       32      32        40x40
+model.22.m.0.0                                          128       64      64        20x20
+
+model params            : 11.434 M
+safe hidden params      : 1.707 M
+safe hidden MACs@audit  : 1.887 G
+max removable channels  : 432
+max removable params    : 0.849 M
+max removable MACs      : 0.826 G
+max model-param fraction: 0.0742
+
+[RASP] running local DepGraph audit...
+DepGraph local-safe : 13/13
+
+[PASS] RASP-SFSeg structural audit
+saved: /home/dang/MedRT-SFOD/runs/seg/rasp_sfseg/rasp_seg_structural_audit.json

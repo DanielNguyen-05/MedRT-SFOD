@@ -1,0 +1,18 @@
+======================================================================
+CVC-CLINICDB -> YOLO26-SEG
+======================================================================
+paired: 612
+
+images       : 612
+empty masks  : 0
+instances    : 646
+
+Instance histogram:
+  1 instance(s): 582 images
+  2 instance(s): 26 images
+  3 instance(s): 4 images
+
+Otsu threshold: min=0.0 mean=8.67 max=119.0
+
+dataset yaml : dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml
+[PASS] CVC-ClinicDB target prepared

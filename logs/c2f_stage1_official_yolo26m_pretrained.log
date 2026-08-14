@@ -1,0 +1,9 @@
+nohup: ignoring input
+[Setup] YOLO26 combined Stage0+Stage1
+[Setup] Using device: cuda:0
+[Setup] Loading weights: /home/dang/research/runs/c2f_source_yolo26m_pretrained/weights/best.pt
+[Stage 0] Saved YOLO26 BN priors to /home/dang/research/runs/c2f_stage1_official_yolo26m_pretrained/yolo26_stage0_bn_priors.json (248 tensors)
+[Stage 1A] AdaBN
+[Epoch 0] imgs=2975 blend_alpha=0.0000 bn_blended_tensors=0 time=148.5s
+[Epoch 1] imgs=2975 blend_alpha=0.0000 bn_blended_tensors=0 time=146.7s
+[Stage 1] Saved adapted YOLO26 checkpoint to: /home/dang/research/runs/c2f_stage1_official_yolo26m_pretrained/yolo26_stage1_adabnrc_foggy_cityscapes.pt

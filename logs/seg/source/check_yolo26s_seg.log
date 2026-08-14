@@ -1,0 +1,18 @@
+========================================================================
+YOLO26-S-SEG PREFLIGHT
+========================================================================
+ultralytics : 8.4.118
+local path  : /home/dang/research/.venv/lib/python3.12/site-packages/ultralytics/__init__.py
+torch       : 2.5.1+cu121
+CUDA        : True
+GPU         : NVIDIA GeForce RTX 4060 Ti
+dataset     : dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml True
+model       : SegmentationModel
+head        : Segment26
+end2end     : True
+nc          : 80
+nm          : 32
+npr         : 128
+params      : 11505800
+params M    : 11.5058
+[PASS] YOLO26-S-Seg ready

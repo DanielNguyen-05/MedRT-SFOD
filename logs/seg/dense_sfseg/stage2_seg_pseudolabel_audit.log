@@ -1,0 +1,37 @@
+nohup: ignoring input
+========================================================================
+STAGE-2 SEGMENTATION PSEUDO-LABEL AUDIT
+========================================================================
+weights : runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt
+images  : 612
+labels loaded : NO
+masks loaded  : NO
+
+model: SegmentationModel
+head : Segment26
+end2end: True
+nc: 1
+nm: 32
+npr: 128
+
+[First batch]
+input: (8, 3, 480, 640)
+O2O: (8, 300, 38)
+O2M: (8, 300, 38)
+proto: (8, 32, 120, 160)
+raw O2M coeff: (8, 32, 6300)
+
+========================================================================
+AUDIT RESULTS
+========================================================================
+O2O selected : 478
+O2M selected : 4135
+DHF anchors  : 478
+DHF extras   : 88
+DHF fused    : 566
+avg/image    : 0.9248
+fused conf   : {'n': 566, 'mean': 0.7986562529006189, 'median': 0.8333791792392731, 'min': 0.5007944107055664, 'max': 0.9616810083389282}
+mask coeff norm: {'n': 566, 'mean': 4.562240734959659, 'median': 4.527954816818237, 'min': 3.426661968231201, 'max': 7.500065803527832}
+
+[PASS] dual-head segmentation outputs ready
+saved: /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/stage2_seg_pseudolabel_audit.json
