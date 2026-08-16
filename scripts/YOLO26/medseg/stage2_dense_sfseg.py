@@ -40,6 +40,10 @@ from mask_dhf_seg import (  # noqa: E402
     generate_mask_dhf_pseudo_masks,
 )
 
+from cc_dhf_seg import (  # noqa: E402
+    generate_cc_dhf_pseudo_masks,
+)
+
 from segmard_seg import (
     add_segmard_args,
     compute_segmard_loss,
@@ -787,6 +791,33 @@ def main():
         default=16,
     )
 
+    ap.add_argument(
+        "--dhf-mode",
+        choices=("mask", "cc"),
+        default="mask",
+        help=(
+            "mask = current Mask-DHF; "
+            "cc = CC-DHF v1 consensus + coverage"
+        ),
+    )
+
+    ap.add_argument(
+        "--cc-tau-match",
+        type=float,
+        default=0.5,
+        help="Same-class box IoU threshold for O2M consensus witnesses.",
+    )
+
+    ap.add_argument(
+        "--cc-max-witnesses",
+        type=int,
+        default=5,
+        help=(
+            "Maximum O2M consensus witnesses per O2O anchor. "
+            "0 means unlimited."
+        ),
+    )
+
     # MARD
     ap.add_argument(
         "--mard-lambda0",
@@ -988,6 +1019,10 @@ def main():
 
     print()
     print(
+        "DHF mode      :",
+        args.dhf_mode,
+    )
+    print(
         "Mask-DHF rel  :",
         args.mask_rel_thr,
     )
@@ -997,6 +1032,19 @@ def main():
         args.stability_low,
         args.stability_high,
     )
+
+    if args.dhf_mode == "cc":
+        print(
+            "CC match IoU :",
+            args.cc_tau_match,
+        )
+        print(
+            "CC witnesses :",
+            args.cc_max_witnesses,
+        )
+        print(
+            "CC fusion    : branch-balanced consensus",
+        )
 
     print()
     print(
@@ -1078,6 +1126,13 @@ def main():
                 "box_extras": 0,
                 "mask_extras": 0,
                 "rejected_rel": 0,
+                "consensus_anchors": 0,
+                "consensus_witnesses": 0,
+                "consensus_fallbacks": 0,
+                "consensus_shift_sum": 0.0,
+                "consensus_shift_count": 0,
+                "consensus_mask_iou_sum": 0.0,
+                "consensus_mask_iou_count": 0,
                 "fg_tokens": 0.0,
                 "hard_bg_tokens": 0.0,
                 "easy_bg_tokens": 0.0,
@@ -1116,13 +1171,13 @@ def main():
                     non_blocking=True,
                 )
 
-                (
-                    labels,
-                    masks,
-                    instance_reliabilities,
-                    ps,
-                ) = (
-                    generate_mask_dhf_pseudo_masks(
+                if args.dhf_mode == "mask":
+                    (
+                        labels,
+                        masks,
+                        instance_reliabilities,
+                        ps,
+                    ) = generate_mask_dhf_pseudo_masks(
                         teacher,
                         weak,
                         tau_o2o=args.tau_o2o,
@@ -1136,7 +1191,28 @@ def main():
                         min_mask_pixels=args.min_mask_pixels,
                         return_instance_reliability=True,
                     )
-                )
+                else:
+                    (
+                        labels,
+                        masks,
+                        instance_reliabilities,
+                        ps,
+                    ) = generate_cc_dhf_pseudo_masks(
+                        teacher,
+                        weak,
+                        tau_o2o=args.tau_o2o,
+                        tau_o2m=args.tau_o2m,
+                        tau_no=args.tau_no,
+                        tau_dup=args.tau_dup,
+                        tau_match=args.cc_tau_match,
+                        max_consensus_witnesses=args.cc_max_witnesses,
+                        mask_threshold=args.mask_thr,
+                        stability_low=args.stability_low,
+                        stability_high=args.stability_high,
+                        reliability_threshold=args.mask_rel_thr,
+                        min_mask_pixels=args.min_mask_pixels,
+                        return_instance_reliability=True,
+                    )
 
                 if not (
                     len(labels)
@@ -1144,7 +1220,7 @@ def main():
                     == len(instance_reliabilities)
                 ):
                     raise RuntimeError(
-                        "Mask-DHF batch output lengths are misaligned"
+                        "DHF batch output lengths are misaligned"
                     )
 
                 for bi_align in range(len(labels)):
@@ -1153,7 +1229,7 @@ def main():
                     n_rel = int(instance_reliabilities[bi_align].shape[0])
                     if not (n_lab == n_mask == n_rel):
                         raise RuntimeError(
-                            f"Mask-DHF image {bi_align}: "
+                            f"DHF image {bi_align}: "
                             f"labels={n_lab} masks={n_mask} rel={n_rel}"
                         )
 
@@ -1387,6 +1463,30 @@ def main():
                     ]
                 )
 
+                if args.dhf_mode == "cc":
+                    totals["consensus_anchors"] += int(
+                        ps.get("consensus_anchors", 0)
+                    )
+                    totals["consensus_witnesses"] += int(
+                        ps.get("consensus_witnesses", 0)
+                    )
+                    totals["consensus_fallbacks"] += int(
+                        ps.get("consensus_fallbacks", 0)
+                    )
+                    shift_count = int(
+                        ps.get("consensus_abs_shift_count", 0)
+                    )
+                    totals["consensus_shift_sum"] += float(
+                        ps.get("consensus_abs_shift_sum", 0.0)
+                    )
+                    totals["consensus_shift_count"] += shift_count
+                    totals["consensus_mask_iou_sum"] += float(
+                        ps.get("consensus_mask_iou_sum", 0.0)
+                    )
+                    totals["consensus_mask_iou_count"] += int(
+                        ps.get("consensus_mask_iou_count", 0)
+                    )
+
                 totals["rel_sum"] += float(rel_cat.sum().item())
                 totals["rel_count"] += int(rel_cat.numel())
                 totals["rel_min"] = min(
@@ -1436,6 +1536,18 @@ def main():
                         f"lambda={lambda_mard:.6f} "
                         f"box_extra={ps['box_dhf_extras']} "
                         f"mask_extra={ps['mask_dhf_extras']} "
+                        + (
+                            (
+                                f"CC={int(ps.get('consensus_anchors', 0))}/"
+                                f"{int(ps.get('consensus_witnesses', 0))} "
+                                f"cc_shift="
+                                f"{float(ps.get('consensus_abs_shift_mean', 0.0)):.5f} "
+                                f"cc_iou="
+                                f"{float(ps.get('consensus_mask_iou_mean', 0.0)):.5f} "
+                            )
+                            if args.dhf_mode == "cc"
+                            else ""
+                        )
                         + (
                             (
                                 f"FG/HBG/EBG="
@@ -1493,7 +1605,20 @@ def main():
                 f"box_extra={totals['box_extras']} "
                 f"mask_extra={totals['mask_extras']} "
                 f"reject_rel={totals['rejected_rel']} "
-                f"loss={totals['loss']/denom:.4f} "
+                + (
+                    (
+                        f"CC={totals['consensus_anchors']}/"
+                        f"{totals['consensus_witnesses']} "
+                        f"cc_fallback={totals['consensus_fallbacks']} "
+                        f"cc_shift="
+                        f"{totals['consensus_shift_sum']/max(totals['consensus_shift_count'], 1):.5f} "
+                        f"cc_iou="
+                        f"{totals['consensus_mask_iou_sum']/max(totals['consensus_mask_iou_count'], 1):.5f} "
+                    )
+                    if args.dhf_mode == "cc"
+                    else ""
+                )
+                + f"loss={totals['loss']/denom:.4f} "
                 f"seg={totals['seg_loss']/denom:.4f} "
                 f"semseg={totals['semseg_loss']/denom:.4f} "
                 f"mard={totals['mard']/denom:.4f} "
@@ -1575,6 +1700,22 @@ def main():
             ),
 
         "epochs": args.epochs,
+
+        "dhf_mode": args.dhf_mode,
+
+        "cc_dhf": {
+            "enabled": args.dhf_mode == "cc",
+            "tau_match": args.cc_tau_match,
+            "max_consensus_witnesses": args.cc_max_witnesses,
+            "consensus_fusion": (
+                "branch-balanced reliability-weighted O2O/O2M soft-mask consensus"
+            ),
+            "coverage_definition": (
+                "same-class best O2O box IoU <= tau_no, then original Mask-DHF NMS+reliability"
+            ),
+            "o2o_box_policy": "unchanged",
+            "o2o_reliability_policy": "unchanged; consensus refines masks only",
+        },
 
         "mask_dhf": {
             "tau_o2o":
