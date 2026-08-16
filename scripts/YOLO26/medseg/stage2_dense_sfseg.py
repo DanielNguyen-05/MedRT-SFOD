@@ -40,6 +40,10 @@ from mask_dhf_seg import (  # noqa: E402
     generate_mask_dhf_pseudo_masks,
 )
 
+from segmard_seg import (
+    add_segmard_args,
+    compute_segmard_loss,
+)
 
 # ================================================================
 # MARD
@@ -857,6 +861,18 @@ def main():
     )
 
     ap.add_argument(
+        "--mard-mode",
+        choices=("box", "mask"),
+        default="mask",
+        help=(
+            "box = original pseudo-box-guided MARD; "
+            "mask = segmentation-guided SegMARD"
+        ),
+    )
+
+    add_segmard_args(ap)
+
+    ap.add_argument(
         "--device",
         default="0",
     )
@@ -993,6 +1009,39 @@ def main():
         args.mard_warmup_epochs,
     )
 
+    print(
+        "MARD mode     :",
+        args.mard_mode,
+    )
+
+    if args.mard_mode == "box":
+        print(
+            "FG definition : inside pseudo bounding box"
+        )
+        print(
+            "BG definition : outside pseudo bounding boxes"
+        )
+    else:
+        print(
+            "FG definition : inside Teacher pseudo segmentation mask"
+        )
+        print(
+            "FG erosion    :",
+            args.segmard_erode_kernel,
+        )
+        print(
+            "mask dilation :",
+            args.segmard_dilate_kernel,
+        )
+        print(
+            "hard BG ratio :",
+            args.segmard_hard_bg_ratio,
+        )
+
+    print(
+        "var/cov obj.   : unchanged"
+    )
+
     global_step = 0
 
     try:
@@ -1015,6 +1064,10 @@ def main():
                 "box_extras": 0,
                 "mask_extras": 0,
                 "rejected_rel": 0,
+                "fg_tokens": 0.0,
+                "hard_bg_tokens": 0.0,
+                "easy_bg_tokens": 0.0,
+                "core_fallbacks": 0.0,
             }
 
             start = time.time()
@@ -1129,21 +1182,39 @@ def main():
                     det_vec.sum()
                 )
 
-                mard_loss, _ = (
-                    compute_mard_loss(
-                        feats,
-                        labels_valid,
-                        int(
-                            strong_valid
-                            .shape[2]
-                        ),
-                        int(
-                            strong_valid
-                            .shape[3]
-                        ),
-                        args,
+                if args.mard_mode == "box":
+                    mard_loss, mard_stats = (
+                        compute_mard_loss(
+                            feats,
+                            labels_valid,
+                            int(
+                                strong_valid
+                                .shape[2]
+                            ),
+                            int(
+                                strong_valid
+                                .shape[3]
+                            ),
+                            args,
+                        )
                     )
-                )
+                else:
+                    mard_loss, mard_stats = (
+                        compute_segmard_loss(
+                            feats=feats,
+                            pseudo_labels=labels_valid,
+                            pseudo_masks=masks_valid,
+                            h_pad=int(
+                                strong_valid
+                                .shape[2]
+                            ),
+                            w_pad=int(
+                                strong_valid
+                                .shape[3]
+                            ),
+                            args=args,
+                        )
+                    )
 
                 lambda_mard = (
                     mard_weight(
@@ -1248,6 +1319,20 @@ def main():
                     ]
                 )
 
+                if args.mard_mode == "mask":
+                    for key in (
+                        "fg_tokens",
+                        "hard_bg_tokens",
+                        "easy_bg_tokens",
+                        "core_fallbacks",
+                    ):
+                        totals[key] += float(
+                            mard_stats.get(
+                                key,
+                                0.0,
+                            )
+                        )
+
                 if (
                     batch_i == 1
                     or batch_i
@@ -1265,7 +1350,19 @@ def main():
                         f"lambda={lambda_mard:.6f} "
                         f"box_extra={ps['box_dhf_extras']} "
                         f"mask_extra={ps['mask_dhf_extras']} "
-                        f"grad_preclip={float(grad_norm):.2f}",
+                        + (
+                            (
+                                f"FG/HBG/EBG="
+                                f"{int(mard_stats.get('fg_tokens', 0))}/"
+                                f"{int(mard_stats.get('hard_bg_tokens', 0))}/"
+                                f"{int(mard_stats.get('easy_bg_tokens', 0))} "
+                                f"fallback="
+                                f"{int(mard_stats.get('core_fallbacks', 0))} "
+                            )
+                            if args.mard_mode == "mask"
+                            else ""
+                        )
+                        + f"grad_preclip={float(grad_norm):.2f}",
                         flush=True,
                     )
 
@@ -1309,7 +1406,17 @@ def main():
                 f"seg={totals['seg_loss']/denom:.4f} "
                 f"semseg={totals['semseg_loss']/denom:.4f} "
                 f"mard={totals['mard']/denom:.4f} "
-                f"lambda_avg={totals['lambda']/denom:.6f}",
+                f"lambda_avg={totals['lambda']/denom:.6f}"
+                + (
+                    (
+                        f" FG/HBG/EBG="
+                        f"{totals['fg_tokens']/denom:.1f}/"
+                        f"{totals['hard_bg_tokens']/denom:.1f}/"
+                        f"{totals['easy_bg_tokens']/denom:.1f}"
+                    )
+                    if args.mard_mode == "mask"
+                    else ""
+                ),
                 flush=True,
             )
 
@@ -1411,6 +1518,20 @@ def main():
                 args.mard_bg_points,
             "eta":
                 args.mard_eta,
+            "mode":
+                args.mard_mode,
+            "foreground_definition":
+                (
+                    "pseudo segmentation mask"
+                    if args.mard_mode == "mask"
+                    else "pseudo bounding box"
+                ),
+            "segmard_erode_kernel":
+                args.segmard_erode_kernel,
+            "segmard_dilate_kernel":
+                args.segmard_dilate_kernel,
+            "segmard_hard_bg_ratio":
+                args.segmard_hard_bg_ratio,
         },
 
         "ema_momentum":
