@@ -1037,9 +1037,23 @@ def main():
             "hard BG ratio :",
             args.segmard_hard_bg_ratio,
         )
+        print(
+            "reliability wt:",
+            "ON"
+            if args.segmard_reliability_weighting
+            else "OFF",
+        )
 
     print(
-        "var/cov obj.   : unchanged"
+        "var/cov obj.   : "
+        + (
+            "reliability-weighted"
+            if (
+                args.mard_mode == "mask"
+                and args.segmard_reliability_weighting
+            )
+            else "unchanged"
+        )
     )
 
     global_step = 0
@@ -1068,6 +1082,11 @@ def main():
                 "hard_bg_tokens": 0.0,
                 "easy_bg_tokens": 0.0,
                 "core_fallbacks": 0.0,
+                "rel_sum": 0.0,
+                "rel_count": 0,
+                "rel_min": 1.0,
+                "rel_max": 0.0,
+                "token_weight_sum": 0.0,
             }
 
             start = time.time()
@@ -1100,6 +1119,7 @@ def main():
                 (
                     labels,
                     masks,
+                    instance_reliabilities,
                     ps,
                 ) = (
                     generate_mask_dhf_pseudo_masks(
@@ -1114,8 +1134,28 @@ def main():
                         stability_high=args.stability_high,
                         reliability_threshold=args.mask_rel_thr,
                         min_mask_pixels=args.min_mask_pixels,
+                        return_instance_reliability=True,
                     )
                 )
+
+                if not (
+                    len(labels)
+                    == len(masks)
+                    == len(instance_reliabilities)
+                ):
+                    raise RuntimeError(
+                        "Mask-DHF batch output lengths are misaligned"
+                    )
+
+                for bi_align in range(len(labels)):
+                    n_lab = int(labels[bi_align].shape[0])
+                    n_mask = int(masks[bi_align].shape[0])
+                    n_rel = int(instance_reliabilities[bi_align].shape[0])
+                    if not (n_lab == n_mask == n_rel):
+                        raise RuntimeError(
+                            f"Mask-DHF image {bi_align}: "
+                            f"labels={n_lab} masks={n_mask} rel={n_rel}"
+                        )
 
                 valid = [
                     i
@@ -1142,6 +1182,29 @@ def main():
                     masks[i]
                     for i in valid
                 ]
+
+                reliabilities_valid = [
+                    instance_reliabilities[i]
+                    for i in valid
+                ]
+
+                rel_cat = torch.cat(
+                    [
+                        r.detach().float().flatten()
+                        for r in reliabilities_valid
+                        if r.numel()
+                    ],
+                    dim=0,
+                )
+
+                if rel_cat.numel() == 0:
+                    raise RuntimeError(
+                        "Valid pseudo batch has no aligned reliabilities"
+                    )
+
+                batch_rel_mean = float(rel_cat.mean().item())
+                batch_rel_min = float(rel_cat.min().item())
+                batch_rel_max = float(rel_cat.max().item())
 
                 avg_conf = (
                     average_confidence(
@@ -1204,6 +1267,11 @@ def main():
                             feats=feats,
                             pseudo_labels=labels_valid,
                             pseudo_masks=masks_valid,
+                            pseudo_reliabilities=(
+                                reliabilities_valid
+                                if args.segmard_reliability_weighting
+                                else None
+                            ),
                             h_pad=int(
                                 strong_valid
                                 .shape[2]
@@ -1319,6 +1387,17 @@ def main():
                     ]
                 )
 
+                totals["rel_sum"] += float(rel_cat.sum().item())
+                totals["rel_count"] += int(rel_cat.numel())
+                totals["rel_min"] = min(
+                    totals["rel_min"],
+                    batch_rel_min,
+                )
+                totals["rel_max"] = max(
+                    totals["rel_max"],
+                    batch_rel_max,
+                )
+
                 if args.mard_mode == "mask":
                     for key in (
                         "fg_tokens",
@@ -1332,6 +1411,13 @@ def main():
                                 0.0,
                             )
                         )
+
+                    totals["token_weight_sum"] += float(
+                        mard_stats.get(
+                            "token_weight_mean",
+                            1.0,
+                        )
+                    )
 
                 if (
                     batch_i == 1
@@ -1358,6 +1444,11 @@ def main():
                                 f"{int(mard_stats.get('easy_bg_tokens', 0))} "
                                 f"fallback="
                                 f"{int(mard_stats.get('core_fallbacks', 0))} "
+                                f"rel={batch_rel_mean:.3f}/"
+                                f"{batch_rel_min:.3f}/"
+                                f"{batch_rel_max:.3f} "
+                                f"wmean="
+                                f"{float(mard_stats.get('token_weight_mean', 1.0)):.3f} "
                             )
                             if args.mard_mode == "mask"
                             else ""
@@ -1412,7 +1503,13 @@ def main():
                         f" FG/HBG/EBG="
                         f"{totals['fg_tokens']/denom:.1f}/"
                         f"{totals['hard_bg_tokens']/denom:.1f}/"
-                        f"{totals['easy_bg_tokens']/denom:.1f}"
+                        f"{totals['easy_bg_tokens']/denom:.1f} "
+                        f"rel="
+                        f"{totals['rel_sum']/max(totals['rel_count'], 1):.3f}/"
+                        f"{totals['rel_min']:.3f}/"
+                        f"{totals['rel_max']:.3f} "
+                        f"wmean="
+                        f"{totals['token_weight_sum']/denom:.3f}"
                     )
                     if args.mard_mode == "mask"
                     else ""
@@ -1532,6 +1629,20 @@ def main():
                 args.segmard_dilate_kernel,
             "segmard_hard_bg_ratio":
                 args.segmard_hard_bg_ratio,
+            "segmard_reliability_weighting":
+                args.segmard_reliability_weighting,
+            "segmard_reliability_definition":
+                (
+                    "sqrt(box_confidence * threshold_stability)"
+                    if args.segmard_reliability_weighting
+                    else "disabled"
+                ),
+            "segmard_reliability_token_policy":
+                (
+                    "FG=r_i; HBG=max r_i of covering hard regions; EBG=1"
+                    if args.segmard_reliability_weighting
+                    else "uniform"
+                ),
         },
 
         "ema_momentum":

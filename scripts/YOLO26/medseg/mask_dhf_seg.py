@@ -153,19 +153,27 @@ def generate_mask_dhf_pseudo_masks(
     stability_high: float = 0.60,
     reliability_threshold: float = 0.744898,
     min_mask_pixels: int = 16,
+    return_instance_reliability: bool = False,
 ):
     """
-    Official MedRT-SFSeg Mask-DHF v1.
+    Official MedRT-SFSeg Mask-DHF v1 + SegMARD-v3 reliability metadata.
 
     O2O:
         trusted anchors.
+        Reliability is computed for SegMARD-v3 weighting only.
+        O2O anchors are NOT rejected by reliability.
 
     O2M:
         confidence
         -> valid mask
         -> box novelty
         -> NMS
-        -> mask-stability reliability.
+        -> mask-stability reliability
+        -> reliability threshold.
+
+    When return_instance_reliability=True, this returns per-image
+    reliability tensors aligned 1:1 with the final fused pseudo boxes
+    and pseudo masks.
 
     No target GT is used.
     """
@@ -227,6 +235,7 @@ def generate_mask_dhf_pseudo_masks(
 
     labels_out = []
     masks_out = []
+    instance_reliability_out = []
 
     totals = {
         "anchors": 0,
@@ -238,6 +247,9 @@ def generate_mask_dhf_pseudo_masks(
         "pseudo": 0,
     }
 
+    # Kept for diagnostic/backward compatibility with the previous
+    # aggregate statistic. This list contains O2M candidate reliabilities
+    # after novelty + NMS and before reliability rejection.
     reliabilities = []
 
     for i in range(
@@ -258,7 +270,7 @@ def generate_mask_dhf_pseudo_masks(
         ]
 
         # --------------------------------------------------------
-        # O2O pseudo masks
+        # O2O pseudo masks + reliability metadata
         # --------------------------------------------------------
 
         anchor_probs = (
@@ -268,6 +280,19 @@ def generate_mask_dhf_pseudo_masks(
                 input_h,
                 input_w,
             )
+        )
+
+        anchor_stability = mask_stability(
+            anchor_probs,
+            low=stability_low,
+            high=stability_high,
+        )
+
+        anchor_reliability = torch.sqrt(
+            (
+                anchors[:, 4]
+                * anchor_stability
+            ).clamp_min(0.0)
         )
 
         anchor_masks = (
@@ -286,6 +311,9 @@ def generate_mask_dhf_pseudo_masks(
             anchors = anchors[keep]
             anchor_masks = (
                 anchor_masks[keep]
+            )
+            anchor_reliability = (
+                anchor_reliability[keep]
             )
 
         totals["anchors"] += int(
@@ -427,6 +455,10 @@ def generate_mask_dhf_pseudo_masks(
                 reliable
             ]
 
+            extra_reliability = (
+                reliability[reliable]
+            )
+
             extra_probs = (
                 candidate_probs[
                     reliable
@@ -440,6 +472,12 @@ def generate_mask_dhf_pseudo_masks(
 
         else:
             extras = candidates
+
+            extra_reliability = torch.zeros(
+                (0,),
+                device=proto.device,
+                dtype=proto.dtype,
+            )
 
             extra_masks = torch.zeros(
                 (
@@ -478,16 +516,30 @@ def generate_mask_dhf_pseudo_masks(
                 dim=0,
             )
 
+            fused_reliability = torch.cat(
+                [
+                    anchor_reliability,
+                    extra_reliability,
+                ],
+                dim=0,
+            )
+
         elif anchors.numel():
             fused = anchors
             fused_masks = (
                 anchor_masks.float()
+            )
+            fused_reliability = (
+                anchor_reliability
             )
 
         else:
             fused = extras
             fused_masks = (
                 extra_masks.float()
+            )
+            fused_reliability = (
+                extra_reliability
             )
 
         if fused.numel():
@@ -500,6 +552,18 @@ def generate_mask_dhf_pseudo_masks(
             fused_masks = (
                 fused_masks[order]
             )
+            fused_reliability = (
+                fused_reliability[order]
+            )
+
+        if not (
+            fused.shape[0]
+            == fused_masks.shape[0]
+            == fused_reliability.shape[0]
+        ):
+            raise RuntimeError(
+                "Final pseudo box/mask/reliability alignment failure"
+            )
 
         totals["pseudo"] += int(
             fused.shape[0]
@@ -507,10 +571,21 @@ def generate_mask_dhf_pseudo_masks(
 
         labels_out.append(fused)
         masks_out.append(fused_masks)
+        instance_reliability_out.append(
+            fused_reliability
+        )
 
     totals["reliabilities"] = (
         reliabilities
     )
+
+    if return_instance_reliability:
+        return (
+            labels_out,
+            masks_out,
+            instance_reliability_out,
+            totals,
+        )
 
     return (
         labels_out,
