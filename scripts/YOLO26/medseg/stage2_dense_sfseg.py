@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -42,6 +43,10 @@ from mask_dhf_seg import (  # noqa: E402
 
 from cc_dhf_seg import (  # noqa: E402
     generate_cc_dhf_pseudo_masks,
+)
+
+from boundary_dhf_seg import (  # noqa: E402
+    generate_boundary_dhf_pseudo_masks,
 )
 
 from segmard_seg import (
@@ -666,6 +671,160 @@ def average_confidence(
 # Main
 # ================================================================
 
+
+def inject_soft_instance_masks(
+    pseudo_batch: dict,
+    soft_masks: list[torch.Tensor],
+) -> dict:
+    """
+    Replace only native instance-mask BCE targets with BDL soft masks.
+
+    build_pseudo_batch() is still called with HARD geometry masks first, so
+    boxes/classes/semantic pseudo targets remain exactly on the baseline path.
+    """
+    if "masks" not in pseudo_batch:
+        raise RuntimeError("Pseudo batch has no instance masks")
+
+    target_masks = pseudo_batch["masks"]
+    if target_masks.ndim != 3:
+        raise RuntimeError(
+            f"Expected pseudo_batch['masks'] [N,H,W], got {tuple(target_masks.shape)}"
+        )
+
+    target_hw = tuple(target_masks.shape[-2:])
+    pieces = []
+    expected_n = 0
+    cursor = 0
+
+    for masks_i in soft_masks:
+        if masks_i.ndim != 3:
+            raise RuntimeError(
+                f"Expected BDL soft masks [N,H,W], got {tuple(masks_i.shape)}"
+            )
+        n_i = int(masks_i.shape[0])
+        expected_n += n_i
+        if n_i == 0:
+            continue
+        resized = F.interpolate(
+            masks_i[:, None].float(),
+            size=target_hw,
+            mode="bilinear",
+            align_corners=False,
+        )[:, 0].clamp(0.0, 1.0)
+
+        # Do not let bilinear interpolation create support outside the exact
+        # HARD baseline masks produced by build_pseudo_batch(). This guarantees
+        # that BDL changes only boundary target confidence, not pseudo geometry.
+        hard_support = (
+            target_masks[cursor:cursor + n_i] > 0.5
+        ).to(device=resized.device, dtype=resized.dtype)
+        resized = resized * hard_support
+        pieces.append(resized)
+        cursor += n_i
+
+    if expected_n != int(target_masks.shape[0]):
+        raise RuntimeError(
+            f"BDL soft-mask count={expected_n} != pseudo batch masks={target_masks.shape[0]}"
+        )
+
+    if pieces:
+        soft = torch.cat(pieces, dim=0).to(
+            device=target_masks.device,
+            dtype=target_masks.dtype,
+        )
+    else:
+        soft = target_masks.new_zeros(target_masks.shape)
+
+    if soft.shape != target_masks.shape:
+        raise RuntimeError(
+            f"BDL resized masks {tuple(soft.shape)} != baseline masks {tuple(target_masks.shape)}"
+        )
+
+    out = dict(pseudo_batch)
+    out["masks"] = soft
+    return out
+
+
+def append_jsonl(path: Path, row: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row) + "\\n")
+
+
+def save_bdl_debug_panels(
+    debug_items,
+    paths,
+    out_dir: Path,
+    epoch: int,
+    batch_i: int,
+    saved_so_far: int,
+    max_images: int,
+) -> int:
+    """Save label-free BDL diagnostic panels for model understanding."""
+    if saved_so_far >= max_images:
+        return saved_so_far
+
+    import matplotlib.pyplot as plt
+
+    vis_dir = out_dir / "bdl_debug"
+    vis_dir.mkdir(parents=True, exist_ok=True)
+
+    for local_i, item in enumerate(debug_items):
+        if saved_so_far >= max_images:
+            break
+
+        image = item["image"].float().clamp(0, 1)
+        if image.ndim != 3:
+            continue
+        image_np = image.permute(1, 2, 0).numpy()
+        h, w = image_np.shape[:2]
+
+        def up(name):
+            x = item[name].float()[None, None]
+            return F.interpolate(
+                x,
+                size=(h, w),
+                mode="bilinear",
+                align_corners=False,
+            )[0, 0].numpy()
+
+        maps = [
+            ("O2O hard", up("o2o_hard"), "gray"),
+            ("O2M witnesses", up("o2m_witness"), "viridis"),
+            ("Disagreement", up("disagreement"), "magma"),
+            ("Inner boundary", up("boundary"), "gray"),
+            ("Soft target", up("soft_target"), "viridis"),
+        ]
+
+        fig, axes = plt.subplots(1, 6, figsize=(18, 3.2))
+        axes[0].imshow(image_np)
+        axes[0].set_title("Target image")
+        axes[0].axis("off")
+
+        for ax, (title, arr, cmap) in zip(axes[1:], maps):
+            im = ax.imshow(arr, cmap=cmap, vmin=0.0, vmax=1.0)
+            ax.set_title(title)
+            ax.axis("off")
+            if title == "Disagreement":
+                fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+        stem = Path(str(paths[local_i])).stem if local_i < len(paths) else f"img{local_i}"
+        fig.suptitle(
+            f"BDL label-free diagnostic | epoch={epoch} batch={batch_i} | {stem}",
+            fontsize=11,
+        )
+        fig.tight_layout()
+        fig.savefig(
+            vis_dir / f"e{epoch:02d}_b{batch_i:03d}_{stem}.png",
+            dpi=160,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
+        saved_so_far += 1
+
+    return saved_so_far
+
+
 def main():
     ap = argparse.ArgumentParser()
 
@@ -793,11 +952,12 @@ def main():
 
     ap.add_argument(
         "--dhf-mode",
-        choices=("mask", "cc"),
+        choices=("mask", "cc", "bdl"),
         default="mask",
         help=(
             "mask = current Mask-DHF; "
-            "cc = CC-DHF v1 consensus + coverage"
+            "cc = rejected simple consensus ablation; "
+            "bdl = cross-head Boundary-Disagreement Learning + Mask-DHF coverage"
         ),
     )
 
@@ -816,6 +976,37 @@ def main():
             "Maximum O2M consensus witnesses per O2O anchor. "
             "0 means unlimited."
         ),
+    )
+
+    # Cross-head Boundary Disagreement Learning (BDL)
+    ap.add_argument(
+        "--bdl-tau-match",
+        type=float,
+        default=0.5,
+        help="Same-class O2M/O2O box IoU threshold for uncertainty witnesses.",
+    )
+    ap.add_argument(
+        "--bdl-max-witnesses",
+        type=int,
+        default=5,
+        help="Maximum O2M uncertainty witnesses per O2O anchor; 0 = unlimited.",
+    )
+    ap.add_argument(
+        "--bdl-boundary-kernel",
+        type=int,
+        default=3,
+        help="Odd erosion kernel defining the inner O2O pseudo-mask boundary.",
+    )
+    ap.add_argument(
+        "--bdl-debug-vis",
+        action="store_true",
+        help="Save label-free O2O/O2M/disagreement/boundary/soft-target panels.",
+    )
+    ap.add_argument(
+        "--bdl-debug-max-images",
+        type=int,
+        default=8,
+        help="Maximum BDL diagnostic panels saved for a run.",
     )
 
     # MARD
@@ -1045,6 +1236,13 @@ def main():
         print(
             "CC fusion    : branch-balanced consensus",
         )
+    elif args.dhf_mode == "bdl":
+        print("BDL match IoU:", args.bdl_tau_match)
+        print("BDL witnesses:", args.bdl_max_witnesses)
+        print("BDL boundary : inner mask band, kernel", args.bdl_boundary_kernel)
+        print("BDL signal   : weighted O2O/O2M pixel-wise |P_o2o-P_o2m|")
+        print("BDL target   : hard geometry + disagreement-softened inner boundary")
+        print("BDL coverage : original Mask-DHF for unmatched novel O2M extras")
 
     print()
     print(
@@ -1105,6 +1303,10 @@ def main():
     )
 
     global_step = 0
+    bdl_debug_saved = 0
+    bdl_history = out_dir / "bdl_diagnostics.jsonl"
+    if args.dhf_mode == "bdl" and bdl_history.exists():
+        bdl_history.unlink()
 
     try:
         for epoch in range(
@@ -1133,6 +1335,17 @@ def main():
                 "consensus_shift_count": 0,
                 "consensus_mask_iou_sum": 0.0,
                 "consensus_mask_iou_count": 0,
+                "bdl_anchors": 0,
+                "bdl_witnesses": 0,
+                "bdl_boundary_fallbacks": 0,
+                "bdl_boundary_disagreement_sum": 0.0,
+                "bdl_boundary_disagreement_count": 0,
+                "bdl_interior_disagreement_sum": 0.0,
+                "bdl_interior_disagreement_count": 0,
+                "bdl_soft_target_shift_sum": 0.0,
+                "bdl_soft_target_shift_count": 0,
+                "bdl_boundary_pixels": 0,
+                "bdl_interior_pixels": 0,
                 "fg_tokens": 0.0,
                 "hard_bg_tokens": 0.0,
                 "easy_bg_tokens": 0.0,
@@ -1171,10 +1384,12 @@ def main():
                     non_blocking=True,
                 )
 
+                bdl_debug_items = None
+
                 if args.dhf_mode == "mask":
                     (
                         labels,
-                        masks,
+                        geometry_masks,
                         instance_reliabilities,
                         ps,
                     ) = generate_mask_dhf_pseudo_masks(
@@ -1191,10 +1406,12 @@ def main():
                         min_mask_pixels=args.min_mask_pixels,
                         return_instance_reliability=True,
                     )
-                else:
+                    supervision_masks = geometry_masks
+
+                elif args.dhf_mode == "cc":
                     (
                         labels,
-                        masks,
+                        geometry_masks,
                         instance_reliabilities,
                         ps,
                     ) = generate_cc_dhf_pseudo_masks(
@@ -1213,24 +1430,66 @@ def main():
                         min_mask_pixels=args.min_mask_pixels,
                         return_instance_reliability=True,
                     )
+                    supervision_masks = geometry_masks
+
+                else:
+                    bdl_result = generate_boundary_dhf_pseudo_masks(
+                        teacher,
+                        weak,
+                        tau_o2o=args.tau_o2o,
+                        tau_o2m=args.tau_o2m,
+                        tau_no=args.tau_no,
+                        tau_dup=args.tau_dup,
+                        tau_match=args.bdl_tau_match,
+                        max_witnesses=args.bdl_max_witnesses,
+                        mask_threshold=args.mask_thr,
+                        stability_low=args.stability_low,
+                        stability_high=args.stability_high,
+                        reliability_threshold=args.mask_rel_thr,
+                        min_mask_pixels=args.min_mask_pixels,
+                        boundary_kernel=args.bdl_boundary_kernel,
+                        return_debug=(
+                            args.bdl_debug_vis
+                            and bdl_debug_saved < args.bdl_debug_max_images
+                        ),
+                    )
+                    if len(bdl_result) == 6:
+                        (
+                            labels,
+                            supervision_masks,
+                            geometry_masks,
+                            instance_reliabilities,
+                            ps,
+                            bdl_debug_items,
+                        ) = bdl_result
+                    else:
+                        (
+                            labels,
+                            supervision_masks,
+                            geometry_masks,
+                            instance_reliabilities,
+                            ps,
+                        ) = bdl_result
 
                 if not (
                     len(labels)
-                    == len(masks)
+                    == len(supervision_masks)
+                    == len(geometry_masks)
                     == len(instance_reliabilities)
                 ):
                     raise RuntimeError(
-                        "DHF batch output lengths are misaligned"
+                        "DHF/BDL batch output lengths are misaligned"
                     )
 
                 for bi_align in range(len(labels)):
                     n_lab = int(labels[bi_align].shape[0])
-                    n_mask = int(masks[bi_align].shape[0])
+                    n_sup = int(supervision_masks[bi_align].shape[0])
+                    n_geo = int(geometry_masks[bi_align].shape[0])
                     n_rel = int(instance_reliabilities[bi_align].shape[0])
-                    if not (n_lab == n_mask == n_rel):
+                    if not (n_lab == n_sup == n_geo == n_rel):
                         raise RuntimeError(
-                            f"DHF image {bi_align}: "
-                            f"labels={n_lab} masks={n_mask} rel={n_rel}"
+                            f"DHF/BDL image {bi_align}: labels={n_lab} "
+                            f"supervision={n_sup} geometry={n_geo} rel={n_rel}"
                         )
 
                 valid = [
@@ -1254,8 +1513,13 @@ def main():
                     for i in valid
                 ]
 
-                masks_valid = [
-                    masks[i]
+                supervision_masks_valid = [
+                    supervision_masks[i]
+                    for i in valid
+                ]
+
+                geometry_masks_valid = [
+                    geometry_masks[i]
                     for i in valid
                 ]
 
@@ -1282,6 +1546,29 @@ def main():
                 batch_rel_min = float(rel_cat.min().item())
                 batch_rel_max = float(rel_cat.max().item())
 
+                if (
+                    args.dhf_mode == "bdl"
+                    and args.bdl_debug_vis
+                    and bdl_debug_items is not None
+                ):
+                    valid_debug = [
+                        bdl_debug_items[i]
+                        for i in valid
+                    ]
+                    valid_paths = [
+                        _paths[i]
+                        for i in valid
+                    ]
+                    bdl_debug_saved = save_bdl_debug_panels(
+                        valid_debug,
+                        valid_paths,
+                        out_dir,
+                        epoch + 1,
+                        batch_i,
+                        bdl_debug_saved,
+                        args.bdl_debug_max_images,
+                    )
+
                 avg_conf = (
                     average_confidence(
                         labels_valid
@@ -1302,13 +1589,21 @@ def main():
                         "captured no features"
                     )
 
+                # Always construct boxes/classes/semantic targets from HARD geometry.
                 pseudo_batch = (
                     build_pseudo_batch(
                         labels_valid,
-                        masks_valid,
+                        geometry_masks_valid,
                         strong_valid.shape,
                     )
                 )
+
+                # BDL modifies only native instance-mask BCE targets.
+                if args.dhf_mode == "bdl":
+                    pseudo_batch = inject_soft_instance_masks(
+                        pseudo_batch,
+                        supervision_masks_valid,
+                    )
 
                 det_vec, loss_items = (
                     criterion(
@@ -1342,7 +1637,7 @@ def main():
                         compute_segmard_loss(
                             feats=feats,
                             pseudo_labels=labels_valid,
-                            pseudo_masks=masks_valid,
+                            pseudo_masks=geometry_masks_valid,
                             pseudo_reliabilities=(
                                 reliabilities_valid
                                 if args.segmard_reliability_weighting
@@ -1487,6 +1782,44 @@ def main():
                         ps.get("consensus_mask_iou_count", 0)
                     )
 
+                if args.dhf_mode == "bdl":
+                    for key in (
+                        "bdl_anchors",
+                        "bdl_witnesses",
+                        "bdl_boundary_fallbacks",
+                        "bdl_boundary_disagreement_count",
+                        "bdl_interior_disagreement_count",
+                        "bdl_soft_target_shift_count",
+                        "bdl_boundary_pixels",
+                        "bdl_interior_pixels",
+                    ):
+                        totals[key] += int(ps.get(key, 0))
+                    for key in (
+                        "bdl_boundary_disagreement_sum",
+                        "bdl_interior_disagreement_sum",
+                        "bdl_soft_target_shift_sum",
+                    ):
+                        totals[key] += float(ps.get(key, 0.0))
+
+                    append_jsonl(
+                        bdl_history,
+                        {
+                            "epoch": epoch + 1,
+                            "batch": batch_i,
+                            "pseudo": pseudo_n,
+                            "anchors": int(ps.get("anchors", 0)),
+                            "bdl_anchors": int(ps.get("bdl_anchors", 0)),
+                            "bdl_witnesses": int(ps.get("bdl_witnesses", 0)),
+                            "boundary_disagreement": float(ps.get("bdl_boundary_disagreement_mean", 0.0)),
+                            "interior_disagreement": float(ps.get("bdl_interior_disagreement_mean", 0.0)),
+                            "boundary_interior_ratio": float(ps.get("bdl_boundary_interior_ratio", 0.0)),
+                            "soft_target_shift": float(ps.get("bdl_soft_target_shift_mean", 0.0)),
+                            "boundary_pixels": int(ps.get("bdl_boundary_pixels", 0)),
+                            "interior_pixels": int(ps.get("bdl_interior_pixels", 0)),
+                            "boundary_fallbacks": int(ps.get("bdl_boundary_fallbacks", 0)),
+                        },
+                    )
+
                 totals["rel_sum"] += float(rel_cat.sum().item())
                 totals["rel_count"] += int(rel_cat.numel())
                 totals["rel_min"] = min(
@@ -1546,6 +1879,19 @@ def main():
                                 f"{float(ps.get('consensus_mask_iou_mean', 0.0)):.5f} "
                             )
                             if args.dhf_mode == "cc"
+                            else ""
+                        )
+                        + (
+                            (
+                                f"BDL={int(ps.get('bdl_anchors', 0))}/"
+                                f"{int(ps.get('bdl_witnesses', 0))} "
+                                f"Dbd/Din="
+                                f"{float(ps.get('bdl_boundary_disagreement_mean', 0.0)):.5f}/"
+                                f"{float(ps.get('bdl_interior_disagreement_mean', 0.0)):.5f} "
+                                f"ratio={float(ps.get('bdl_boundary_interior_ratio', 0.0)):.2f} "
+                                f"soft_shift={float(ps.get('bdl_soft_target_shift_mean', 0.0)):.5f} "
+                            )
+                            if args.dhf_mode == "bdl"
                             else ""
                         )
                         + (
@@ -1616,6 +1962,21 @@ def main():
                         f"{totals['consensus_mask_iou_sum']/max(totals['consensus_mask_iou_count'], 1):.5f} "
                     )
                     if args.dhf_mode == "cc"
+                    else ""
+                )
+                + (
+                    (
+                        f"BDL={totals['bdl_anchors']}/{totals['bdl_witnesses']} "
+                        f"bdl_fallback={totals['bdl_boundary_fallbacks']} "
+                        f"Dbd/Din="
+                        f"{totals['bdl_boundary_disagreement_sum']/max(totals['bdl_boundary_disagreement_count'], 1):.5f}/"
+                        f"{totals['bdl_interior_disagreement_sum']/max(totals['bdl_interior_disagreement_count'], 1):.5f} "
+                        f"ratio="
+                        f"{(totals['bdl_boundary_disagreement_sum']/max(totals['bdl_boundary_disagreement_count'], 1))/max(totals['bdl_interior_disagreement_sum']/max(totals['bdl_interior_disagreement_count'], 1), 1e-8):.2f} "
+                        f"soft_shift="
+                        f"{totals['bdl_soft_target_shift_sum']/max(totals['bdl_soft_target_shift_count'], 1):.5f} "
+                    )
+                    if args.dhf_mode == "bdl"
                     else ""
                 )
                 + f"loss={totals['loss']/denom:.4f} "
@@ -1715,6 +2076,25 @@ def main():
             ),
             "o2o_box_policy": "unchanged",
             "o2o_reliability_policy": "unchanged; consensus refines masks only",
+        },
+
+        "boundary_disagreement_learning": {
+            "enabled": args.dhf_mode == "bdl",
+            "tau_match": args.bdl_tau_match,
+            "max_witnesses": args.bdl_max_witnesses,
+            "boundary_kernel": args.bdl_boundary_kernel,
+            "uncertainty": (
+                "reliability-weighted mean absolute O2O/O2M soft-mask disagreement"
+            ),
+            "pseudo_target_rule": (
+                "keep O2O hard geometry; soften only the inner positive boundary toward "
+                "O2O soft probability by pixel-wise disagreement"
+            ),
+            "coverage": (
+                "unmatched novel O2M follows original Mask-DHF NMS + reliability gate"
+            ),
+            "target_gt_used": False,
+            "debug_visualization": args.bdl_debug_vis,
         },
 
         "mask_dhf": {
