@@ -1,4 +1,4 @@
-# MedRT-SFOD / MedRT-SFSeg
+<!-- # MedRT-SFOD / MedRT-SFSeg
 ## Kiến trúc tổng thể cho Source-Free Real-Time Medical Image Segmentation
 
 > Tài liệu này mô tả **kiến trúc, luồng dữ liệu, các module và cơ chế huấn luyện/inference** của hệ thống MedRT-SFOD hiện tại.  
@@ -1849,4 +1849,1475 @@ Source YOLO26-S-Seg
 → RASP-SFSeg
 → physical compaction
 → O2O-only real-time deployment
+``` -->
+
+Được, mình tạm **dừng hoàn toàn V4**. Bây giờ nên chuẩn hóa lại “dòng tiến hóa” của model trước, vì nếu không thì sau này viết Method/Ablation rất dễ bị lẫn giữa Mask-DHF, MARD, SegMARD và pruning.
+
+Một lưu ý trước: tên **MedRT-SFOD** hiện là tên kế thừa từ hướng Source-Free Object Detection ban đầu. Nhưng từ khi chuyển sang YOLO26-Seg và tối ưu Dice/IoU/mask mAP, bản chất hệ thống hiện tại là **source-free medical image segmentation**. Vì vậy khi viết paper cuối cùng, tên như **MedRT-SFSeg** sẽ chính xác hơn. Trong phần dưới mình vẫn gọi V0/V1/V2/V3 đúng như bảng của bạn để dễ đối chiếu.
+
+---
+
+# 1. Kiến trúc nền chung của tất cả V0–V3
+
+Trước khi nói từng version, cần hiểu rằng V1/V2/V3 **không phải ba model hoàn toàn khác nhau**. Chúng đều xây trên cùng một pipeline nền.
+
+Pipeline tổng quát hiện tại là:
+
+```text
+Kvasir labeled source
+        │
+        ▼
+YOLO26-S-Seg supervised training
+        │
+        ▼
+Source model
+        │
+        │ source data discarded
+        ▼
+CVC-ClinicDB target images only
+        │
+        ▼
+AdaBN
+        │
+        ▼
+Mean Teacher
+ Teacher ───────────── Student
+   │                       │
+ weak image             strong image
+   │                       │
+   ▼                       │
+O2O + O2M predictions      │
+   │                       │
+   ▼                       │
+Mask-DHF                   │
+   │                       │
+pseudo boxes + masks       │
+   ├───────────────┐       │
+   │               │       │
+   ▼               ▼       ▼
+Native Seg Loss    MARD / SegMARD
+   │               │
+   └───────┬───────┘
+           ▼
+      update Student
+           │
+           ▼
+      EMA Teacher
 ```
+
+Các version khác nhau chủ yếu ở **khối representation regularization phía dưới**, tức MARD/SegMARD.
+
+---
+
+# 2. Source-only — model gốc trước adaptation
+
+Đây chưa phải MedRT-SFOD V0.
+
+Bạn train:
+
+```text
+YOLO26-S-Seg
+```
+
+trên Kvasir có label/mask.
+
+Sau khi train xong, model được đem thẳng sang CVC-ClinicDB mà **không adaptation**.
+
+Do domain shift:
+
+```text
+Kvasir
+→ CVC-ClinicDB
+```
+
+performance giảm mạnh.
+
+Trong bảng hiện tại:
+
+```text
+Kvasir
+Dice = 83.94%
+IoU  = 78.17%
+
+CVC zero-shot
+Dice = 72.75%
+IoU  = 65.54%
+```
+
+Đây chính là baseline chứng minh rằng:
+
+[
+P_S(X,Y)\neq P_T(X,Y)
+]
+
+và cần target-domain adaptation.
+
+---
+
+# 3. AdaBN — bước adaptation đầu tiên
+
+Trước V0 còn có một bước quan trọng là **Adaptive Batch Normalization**.
+
+Ta không dùng target labels.
+
+Model chỉ chạy target images qua mạng để cập nhật statistics của BatchNorm:
+
+[
+\mu_S,\sigma_S
+\rightarrow
+\mu_T,\sigma_T
+]
+
+Ý tưởng là weights vẫn đến từ source model nhưng normalization statistics được điều chỉnh theo distribution của CVC-ClinicDB.
+
+Kết quả trước đây:
+
+```text
+Source-only CVC Dice = 72.75%
+AdaBN CVC Dice       = 74.39%
+```
+
+Nó giúp, nhưng chưa đủ.
+
+AdaBN vì vậy là **initialization cho mọi V0/V1/V2/V3**, chứ không phải contribution riêng của từng version.
+
+---
+
+# 4. MedRT-SFOD V0 — Dense Source-Free Adaptation baseline
+
+Đây là version đầu tiên thực sự hoàn chỉnh.
+
+Có thể hiểu:
+
+[
+\boxed{
+V0 =
+AdaBN
++
+MeanTeacher
++
+MaskDHF
++
+OriginalMARD
+}
+]
+
+V0 là nền tảng mà V1/V2/V3 phát triển từ đó.
+
+---
+
+## 4.1 Mean Teacher
+
+Ta tạo hai model:
+
+```text
+Teacher
+Student
+```
+
+Ban đầu:
+
+```text
+Teacher = Student = AdaBN model
+```
+
+Target image được tạo thành hai views:
+
+```text
+weak augmentation   → Teacher
+strong augmentation → Student
+```
+
+Teacher sinh pseudo labels.
+
+Student học từ pseudo labels.
+
+Sau mỗi epoch:
+
+[
+\theta_T
+\leftarrow
+\alpha\theta_T+
+(1-\alpha)\theta_S
+]
+
+với:
+
+[
+\alpha=0.999
+]
+
+Teacher vì vậy là một EMA model ổn định hơn Student.
+
+Quan trọng:
+
+> Không target GT nào được dùng trong adaptation.
+
+---
+
+# 5. Dual-head YOLO26-Seg: O2O và O2M
+
+YOLO26-Seg của bạn có hai prediction heads.
+
+### One-to-One — O2O
+
+O2O ưu tiên prediction sạch, ít duplicate hơn.
+
+Trong framework:
+
+```text
+O2O = reliable anchors
+```
+
+Nó đóng vai trò pseudo-label nền.
+
+### One-to-Many — O2M
+
+O2M tạo nhiều candidate hơn.
+
+Ưu điểm:
+
+```text
+higher recall
+higher coverage
+```
+
+Nhưng nhược điểm:
+
+```text
+duplicates
+false positives
+unstable masks
+```
+
+Do đó không thể lấy toàn bộ O2M prediction làm pseudo label.
+
+Đây là lý do có Dual-Head Fusion.
+
+---
+
+# 6. Mask-DHF — Mask-aware Dual-Head Fusion
+
+Đây là một contribution segmentation-specific quan trọng và **được giữ nguyên ở V0, V1, V2, V3**.
+
+Pipeline cơ bản:
+
+```text
+O2O
+ │
+ └── trusted anchors
+
+O2M
+ │
+ ├── confidence filtering
+ ├── valid mask filtering
+ ├── novelty vs O2O
+ ├── class-wise NMS
+ ├── mask stability
+ └── reliability filtering
+       │
+       ▼
+ reliable O2M extras
+
+O2O anchors
++
+reliable O2M extras
+       │
+       ▼
+final pseudo boxes + masks
+```
+
+---
+
+## 6.1 Novelty filtering
+
+Một O2M candidate chỉ nên được thêm nếu nó không duplicate với O2O.
+
+Ta dùng:
+
+[
+IoU_{box}(p_{o2m},A_{o2o})
+\le\tau_{no}
+]
+
+với:
+
+[
+\tau_{no}=0.2
+]
+
+Ý nghĩa:
+
+> O2M được dùng để bổ sung vùng mà O2O bỏ sót, không phải để nhân đôi những gì O2O đã biết.
+
+---
+
+# 7. Mask stability
+
+Một box confidence cao chưa chắc mask tốt.
+
+Do đó ta tạo hai mask từ cùng soft probability:
+
+[
+M_{low}
+=======
+
+\mathbb{1}[P\ge0.40]
+]
+
+[
+M_{high}
+========
+
+\mathbb{1}[P\ge0.60]
+]
+
+rồi tính:
+
+[
+q_{stab}
+========
+
+IoU(M_{low},M_{high})
+]
+
+Nếu mask ít thay đổi khi threshold chuyển từ `0.4 → 0.6`:
+
+```text
+q_stab cao
+→ mask ổn định
+```
+
+Nếu mask thay đổi rất nhiều:
+
+```text
+q_stab thấp
+→ boundary / mask prediction không đáng tin
+```
+
+---
+
+# 8. Mask reliability
+
+Ta kết hợp:
+
+```text
+box confidence
++
+mask stability
+```
+
+thành:
+
+[
+r_i
+===
+
+\sqrt{s_iq_i^{stab}}
+]
+
+Trong đó:
+
+[
+s_i=\text{box confidence}
+]
+
+và:
+
+[
+q_i^{stab}
+=\text{mask stability}
+]
+
+Đối với O2M extras, chỉ candidate có:
+
+[
+r_i\ge0.744898
+]
+
+mới được giữ.
+
+Threshold `0.744898` được lấy từ target prediction statistics theo label-free calibration, không dùng CVC GT để chọn.
+
+---
+
+# 9. Native segmentation pseudo-supervision
+
+Sau Mask-DHF, Student nhận:
+
+```text
+pseudo boxes
+pseudo classes
+pseudo instance masks
+pseudo semantic masks
+```
+
+và sử dụng native YOLO26 segmentation criterion.
+
+Loss chứa:
+
+[
+L_{seg}
+=======
+
+L_{box}
++
+L_{instance-mask}
++
+L_{cls}
++
+L_{dfl}
++
+L_{semantic}
+]
+
+Tức model không chỉ self-train detection box mà thực sự self-train segmentation.
+
+---
+
+# 10. V0 sử dụng Original MARD
+
+Đây là phần rất quan trọng để hiểu V1/V2/V3.
+
+MARD nghĩa là:
+
+> **Multi-scale Adaptive Representation Diversification**
+
+MARD lấy feature maps:
+
+```text
+P3
+P4
+P5
+```
+
+ngay trước segmentation head.
+
+Mỗi pseudo object được assign vào một feature level tùy kích thước:
+
+```text
+small object  → P3
+medium object → P4
+large object  → P5
+```
+
+Sau đó sample feature vectors.
+
+---
+
+# 11. V0 foreground sampling: Bounding-box guided
+
+Original MARD vốn xuất phát từ detection.
+
+Nó coi:
+
+[
+x\in B_i
+]
+
+là foreground.
+
+Ví dụ:
+
+```text
+Pseudo box
+┌────────────────────────┐
+│                        │
+│     actual polyp       │
+│      ███████           │
+│    ███████████         │
+│      ███████           │
+│                        │
+└────────────────────────┘
+
+Original MARD:
+toàn bộ vùng bên trong box
+= foreground candidate
+```
+
+Vấn đề là segmentation có pixel-level structure.
+
+Trong box có rất nhiều:
+
+```text
+mucosa
+background
+border
+specular region
+```
+
+nhưng Original MARD vẫn coi những vùng đó như foreground.
+
+Đây chính là hạn chế mà V1 giải quyết.
+
+---
+
+# 12. MARD sampling budget
+
+Current setting:
+
+```text
+FG tokens     = 8 / object
+BG tokens     = 128 / image / feature level
+top-k objects = 15
+```
+
+Ví dụ một image có một object ở P4:
+
+```text
+P3: 128 BG
+P4: 8 FG + 128 BG
+P5: 128 BG
+```
+
+Feature vectors sau đó được concat lại.
+
+---
+
+# 13. MARD representation objective
+
+MARD không phải segmentation loss.
+
+Nó là **representation regularizer**.
+
+Có hai thành phần.
+
+### Variance preservation
+
+Muốn từng feature dimension không collapse:
+
+[
+L_{var}
+=======
+
+\frac{1}{C}
+\sum_c
+\max(0,\gamma-\sigma_c)
+]
+
+Nếu một dimension có variance quá thấp:
+
+```text
+all target features look similar
+→ representation collapse
+```
+
+MARD phạt điều đó.
+
+### Covariance decorrelation
+
+Ta cũng không muốn các dimensions chứa cùng một information.
+
+Do đó penalize off-diagonal covariance:
+
+[
+L_{cov}
+=======
+
+\sum_{i\neq j}
+Cov(z_i,z_j)^2
+]
+
+Tổng:
+
+[
+L_{MARD}
+========
+
+\alpha L_{var}
++
+\beta L_{cov}
+]
+
+với hiện tại:
+
+```text
+α = 1.0
+β = 0.1
+```
+
+Final adaptation loss:
+
+[
+L
+=
+
+L_{SFSeg}
++
+\lambda_{MARD}L_{MARD}
+]
+
+---
+
+# 14. MedRT-SFOD V0 hoàn chỉnh
+
+Có thể viết V0 như:
+
+[
+\boxed{
+V0 =
+AdaBN
++
+MeanTeacher
++
+O2O/O2M
++
+MaskDHF
++
+BoxGuidedMARD
+}
+]
+
+Kết quả:
+
+```text
+Dice  = 80.36%
+IoU   = 72.61%
+mAP50 = 81.71%
+```
+
+so với Source-only:
+
+```text
+Dice = 72.75%
+```
+
+Đây là một gain rất lớn.
+
+---
+
+# 15. MedRT-SFOD V0 Compact
+
+Bản compact **không phải V1**.
+
+Nó là:
+
+[
+\boxed{
+V0Compact = V0 + RASP
+}
+]
+
+Trong đó RASP là pruning/compression pipeline.
+
+Các channel được đánh giá dựa trên target adaptation bằng các thành phần như:
+
+```text
+Taylor importance
+GMM
+cost-aware ranking
+Kneedle
+reliability gating
+recovery cycles
+structured physical compaction
+```
+
+Mục tiêu:
+
+```text
+V0 Dense
+10.366 M
+   ↓
+V0 Compact
+10.227 M evaluator params
+```
+
+Nhưng compression thực tế chỉ khoảng hơn 1%.
+
+Accuracy cũng giảm:
+
+```text
+V0 Dice         80.36%
+V0 Compact Dice 79.23%
+```
+
+Do đó sau khi thử nghiệm, kết luận hiện tại là:
+
+> RASP khá phức tạp nhưng compression quá nhỏ để biện minh cho accuracy loss và complexity.
+
+Vì vậy mình đã khuyên **không dùng pruning làm contribution chính nữa**.
+
+---
+
+# 16. MedRT-SFOD V1 — Mask-guided SegMARD
+
+Đây là thay đổi lớn đầu tiên đối với MARD.
+
+V1 giữ nguyên:
+
+```text
+AdaBN
+Mean Teacher
+O2O/O2M
+Mask-DHF
+native segmentation loss
+MARD var/cov objective
+P3/P4/P5
+FG=8
+BG=128
+```
+
+Chỉ thay:
+
+[
+\boxed{
+BoundingBoxForeground
+\rightarrow
+PseudoMaskForeground
+}
+]
+
+---
+
+# 17. Vì sao V1 hợp lý hơn cho segmentation?
+
+Original MARD giả định:
+
+[
+x\in B_i
+\Rightarrow
+x\text{ is foreground}
+]
+
+Nhưng với segmentation:
+
+[
+x\in B_i
+\not\Rightarrow
+x\in object
+]
+
+V1 dùng:
+
+[
+x\in M_i
+\Rightarrow
+x\text{ is foreground}
+]
+
+Ví dụ:
+
+```text
+V0:
+
+┌────────────────────────┐
+│ FG FG FG FG FG FG      │
+│ FG   ███████   FG      │
+│ FG ███████████ FG      │
+│ FG   ███████   FG      │
+│ FG FG FG FG FG FG      │
+└────────────────────────┘
+
+toàn box = FG
+
+
+V1:
+
+┌────────────────────────┐
+│                        │
+│      ███████           │
+│    ███████████         │
+│      ███████           │
+│                        │
+└────────────────────────┘
+
+chỉ pseudo mask = FG
+```
+
+Đây là lúc MARD chuyển từ detection-oriented sang segmentation-oriented.
+
+Vì vậy mình gọi module mới là:
+
+> **SegMARD — Segmentation-Guided Multi-scale Adaptive Representation Diversification**
+
+---
+
+# 18. V1 background vẫn giữ nguyên V0
+
+Để ablation sạch, V1 **không thay background**.
+
+Ở mỗi level:
+
+[
+R_{BG}
+======
+
+\Omega\setminus B
+]
+
+Tức:
+
+```text
+FG = inside pseudo mask
+BG = outside pseudo box
+```
+
+Vùng:
+
+```text
+inside box
+but outside mask
+```
+
+không được coi là FG nữa, nhưng cũng chưa được dùng làm BG.
+
+---
+
+# 19. Tại sao V1 là clean ablation?
+
+Mọi thứ khác giữ nguyên:
+
+```text
+V0:
+FG = box
+BG = outside box
+
+V1:
+FG = mask
+BG = outside box
+```
+
+Do đó performance difference gần như có thể quy trực tiếp cho:
+
+[
+box-guided
+\rightarrow
+mask-guided
+]
+
+Kết quả:
+
+```text
+V0 Dice = 80.36%
+V1 Dice = 80.64%
+
+V0 IoU  = 72.61%
+V1 IoU  = 72.81%
+```
+
+V1 thắng.
+
+Điều này hỗ trợ hypothesis:
+
+> Feature sampling dựa trên object mask phù hợp với segmentation hơn sampling từ toàn bounding box.
+
+---
+
+# 20. MedRT-SFOD V2 — Mask FG + Hard Background
+
+Sau V1, ta phát hiện một vùng rất thú vị:
+
+[
+B_i\setminus M_i
+]
+
+Tức:
+
+> nằm trong object box nhưng Teacher nói không phải object mask.
+
+Vùng này thường là mucosa/background rất gần polyp.
+
+Đây là **hard background**.
+
+---
+
+# 21. V2 chia không gian thành ba region
+
+V2 định nghĩa:
+
+### Foreground
+
+[
+R_{FG}=M_i
+]
+
+### Hard Background
+
+[
+R_{HBG}
+=======
+
+B_i\setminus M_i
+]
+
+### Easy Background
+
+[
+R_{EBG}
+=======
+
+\Omega\setminus B_i
+]
+
+Minh họa:
+
+```text
+                         pseudo bbox
+             ┌───────────────────────────┐
+             │ HBG HBG HBG HBG HBG      │
+             │ HBG    ███████    HBG    │
+             │ HBG  ███████████  HBG    │
+             │ HBG    ███████    HBG    │
+             │ HBG HBG HBG HBG HBG      │
+             └───────────────────────────┘
+
+outside box = EBG
+
+████ = FG
+HBG  = difficult nearby background
+EBG  = easy distant background
+```
+
+---
+
+# 22. Tại sao Hard Background có ích?
+
+Segmentation không chỉ phải học:
+
+> “polyp trông như thế nào?”
+
+mà còn phải học:
+
+> “pixel rất gần polyp nhưng không thuộc polyp khác polyp như thế nào?”
+
+Đặc biệt trong colonoscopy:
+
+```text
+polyp boundary
+mucosal folds
+specular highlight
+texture similarity
+```
+
+có thể rất khó phân biệt.
+
+Do đó HBG chứa nhiều information hơn một random background pixel rất xa object.
+
+---
+
+# 23. V2 vẫn giữ token budget công bằng
+
+Điều cực quan trọng:
+
+V2 **không tăng tổng BG tokens**.
+
+V1:
+
+```text
+object-assigned level:
+128 EBG
+```
+
+V2:
+
+```text
+object-assigned level:
+64 HBG
++
+64 EBG
+=
+128 BG
+```
+
+Hai level còn lại không chứa object vẫn:
+
+```text
+128 EBG
+```
+
+Do đó compute/sample count gần như giữ nguyên.
+
+Current:
+
+[
+hard_bg_ratio=0.5
+]
+
+---
+
+# 24. V2 architecture
+
+Ta có:
+
+[
+\boxed{
+V2 =
+V1
++
+RegionAwareBackgroundSampling
+}
+]
+
+hay cụ thể:
+
+[
+\boxed{
+V2 =
+MaskFG
++
+HardBG
++
+EasyBG
+}
+]
+
+MARD variance/covariance **vẫn không đổi**.
+
+---
+
+# 25. Kết quả V2
+
+```text
+V1:
+Dice = 80.64%
+IoU  = 72.81%
+
+V2:
+Dice = 80.74%
+IoU  = 72.94%
+```
+
+Precision và Sensitivity cũng tăng.
+
+Điều này hỗ trợ hypothesis thứ hai:
+
+> Việc khai thác background nằm bên trong object box nhưng ngoài pseudo mask cung cấp useful hard negatives cho representation learning.
+
+Do đó V2 hiện là version có **thiết kế cân bằng nhất**.
+
+---
+
+# 26. MedRT-SFOD V3 — Reliability-weighted SegMARD
+
+V3 đặt câu hỏi khác:
+
+> Tất cả pseudo masks có nên ảnh hưởng MARD bằng nhau không?
+
+V2 giả định:
+
+```text
+pseudo object A → weight 1
+pseudo object B → weight 1
+pseudo object C → weight 1
+```
+
+dù Teacher có thể rất chắc A nhưng không chắc C.
+
+---
+
+# 27. Reliability của mỗi pseudo instance
+
+Ta tận dụng score đã có trong Mask-DHF:
+
+[
+r_i
+===
+
+\sqrt{s_iq_i^{stab}}
+]
+
+Với:
+
+```text
+s_i      = detection confidence
+q_stab   = mask threshold stability
+```
+
+Trong V3, ta tính reliability cho **cả O2O và O2M**.
+
+Nhưng rất quan trọng:
+
+### O2M
+
+Vẫn giữ filtering như V2:
+
+[
+r_i\ge0.744898
+]
+
+### O2O
+
+Ta **không reject anchor**.
+
+Reliability của O2O chỉ được dùng cho representation weighting.
+
+Do đó:
+
+```text
+V2 pseudo labels
+=
+V3 pseudo labels
+```
+
+Đây là clean ablation.
+
+---
+
+# 28. V3 không thay sample locations
+
+Một điểm nữa rất quan trọng.
+
+V3 vẫn dùng:
+
+```text
+FG = mask
+HBG = inside box outside mask
+EBG = outside box
+
+FG points = 8
+BG points = 128
+HBG ratio = 0.5
+```
+
+Tức:
+
+```text
+V2 token coordinates
+≈
+V3 token coordinates
+```
+
+Chỉ thay cách token đóng góp vào statistical loss.
+
+---
+
+# 29. Weighted representation statistics
+
+V2 dùng standard mean:
+
+[
+\mu
+===
+
+\frac1N
+\sum_n z_n
+]
+
+V3 dùng weighted mean:
+
+[
+\mu_w
+=====
+
+\frac{\sum_nw_nz_n}
+{\sum_nw_n}
+]
+
+Weighted variance:
+
+[
+Var_w
+=====
+
+\frac{
+\sum_nw_n(z_n-\mu_w)^2
+}{
+\sum_nw_n
+}
+]
+
+Weighted covariance cũng tương tự.
+
+---
+
+# 30. V3 token weighting
+
+Current design:
+
+```text
+FG token from instance i
+→ weight = r_i
+
+HBG associated with pseudo objects
+→ reliability-derived weight
+
+Easy BG
+→ weight = 1
+```
+
+Ví dụ:
+
+```text
+Pseudo A reliability = 0.95
+Pseudo B reliability = 0.68
+
+A foreground features
+→ strong influence
+
+B foreground features
+→ weaker influence
+```
+
+Ý tưởng là noisy pseudo mask không nên định hình representation mạnh bằng reliable pseudo mask.
+
+---
+
+# 31. V3 không phải “confidence weighted loss”
+
+Điểm này khá quan trọng khi sau này viết paper.
+
+Ta **không làm**:
+
+[
+L=r_iL_{MARD}
+]
+
+một cách đơn giản.
+
+Ta đưa reliability vào **bên trong statistical estimation**:
+
+```text
+weighted mean
+weighted variance
+weighted covariance
+```
+
+Nên contribution về mặt kỹ thuật khác hẳn một global loss weight.
+
+---
+
+# 32. Kết quả V3
+
+V3 đạt:
+
+```text
+Dice       80.77%
+IoU        73.02%
+Precision  80.61%
+Specificity 96.90%
+```
+
+Đây là Dice/IoU cao nhất trong bảng hiện tại.
+
+Nhưng:
+
+```text
+mAP50:
+V2 = 81.99%
+V3 = 81.74%
+
+mAP50-95:
+V2 ≈ 56.01%
+V3 ≈ 55.57%
+```
+
+Do đó V3 tạo một trade-off:
+
+```text
+pixel overlap / segmentation quality
+↑ nhẹ
+
+instance localization/AP
+↓
+```
+
+Điều này khiến V3 chưa rõ ràng là “better model” toàn diện.
+
+---
+
+# 33. Tóm tắt evolution V0 → V3
+
+| Version         | Mean Teacher | Mask-DHF | FG sampling            | BG sampling           | Reliability trong MARD | Pruning  | Ý nghĩa                                                |
+| --------------- | ------------ | -------- | ---------------------- | --------------------- | ---------------------- | -------- | ------------------------------------------------------ |
+| **Source only** | ✗            | ✗        | —                      | —                     | —                      | ✗        | Zero-shot source model                                 |
+| **V0**          | ✓            | ✓        | **Inside bbox**        | Outside bbox          | ✗                      | ✗        | Dense SFDA baseline + original detection-oriented MARD |
+| **V0 Compact**  | ✓            | ✓        | Inside bbox            | Outside bbox          | ✗                      | **RASP** | Compression experiment của V0                          |
+| **V1**          | ✓            | ✓        | **Inside pseudo mask** | Outside bbox          | ✗                      | ✗        | Segmentation-aware foreground                          |
+| **V2**          | ✓            | ✓        | Inside pseudo mask     | **Hard BG + Easy BG** | ✗                      | ✗        | Region-aware SegMARD                                   |
+| **V3**          | ✓            | ✓        | Inside pseudo mask     | Hard BG + Easy BG     | **Weighted var/cov**   | ✗        | Reliability-aware representation statistics            |
+
+---
+
+# 34. Nếu nhìn dưới góc độ “contribution”, thực ra có ba tầng
+
+### Foundation
+
+Đây là framework nền:
+
+```text
+AdaBN
++
+Mean Teacher
++
+YOLO26 dual-head O2O/O2M
++
+source-free self-training
+```
+
+### Contribution 1 — Mask-DHF
+
+Giải quyết pseudo-label generation:
+
+[
+O2O\ anchors
++
+reliable\ O2M\ coverage
+]
+
+với mask stability:
+
+[
+q_{stab}
+]
+
+và:
+
+[
+r_{mask}
+========
+
+\sqrt{s q_{stab}}
+]
+
+### Contribution 2 — SegMARD
+
+Giải quyết target representation adaptation.
+
+Nó tiến hóa:
+
+```text
+Original MARD
+box foreground
+        │
+        ▼
+SegMARD V1
+mask foreground
+        │
+        ▼
+SegMARD V2
+mask foreground
++
+hard/easy background
+        │
+        ▼
+SegMARD V3
++
+reliability-aware statistics
+```
+
+Đây mới là câu chuyện phát triển rất rõ của V0 → V3.
+
+---
+
+# 35. Cách mình nhìn kết quả hiện tại
+
+Điều đáng chú ý là gain lớn nhất không đến từ việc làm method ngày càng phức tạp.
+
+Ta có:
+
+```text
+Source-only
+72.75 Dice
+       │
+       │ entire SFDA framework
+       ▼
+V0
+80.36
+       │
+       │ bbox FG → mask FG
+       ▼
+V1
+80.64
+       │
+       │ + hard background
+       ▼
+V2
+80.74
+       │
+       │ + reliability weighting
+       ▼
+V3
+80.77
+```
+
+Điều này nói rằng:
+
+[
+\boxed{
+\text{Region semantics}
+
+>
+
+\text{simply adding more weighting complexity}
+}
+]
+
+V1 và V2 tạo ra một conceptual improvement rất rõ:
+
+> **“Representation diversification should respect segmentation geometry.”**
+
+Trong khi V3 là refinement nhỏ hơn.
+
+---
+
+# 36. Một điểm rất quan trọng: V1/V2/V3 không làm model inference nặng hơn
+
+Toàn bộ:
+
+```text
+Teacher
+O2M branch usage
+Mask-DHF
+MARD
+SegMARD
+reliability weighting
+```
+
+chỉ tồn tại trong **target adaptation/training**.
+
+Khi deploy:
+
+```text
+target image
+   ↓
+adapted YOLO26-S-Seg Student
+   ↓
+O2O segmentation inference
+```
+
+Do đó:
+
+```text
+V0 params = 10.366M
+V1 params = 10.366M
+V2 params = 10.366M
+V3 params = 10.366M
+```
+
+Điều này cực kỳ quan trọng với mục tiêu **real-time segmentation**.
+
+Ta có thể làm adaptation logic khá thông minh mà không làm inference architecture lớn hơn.
+
+---
+
+# 37. Nếu phải mô tả mỗi version chỉ bằng một câu
+
+**V0**
+
+> Source-free Mean-Teacher segmentation using Mask-DHF pseudo-label fusion and the original box-guided MARD representation regularizer.
+
+**V1**
+
+> V0 with MARD foreground sampling changed from bounding-box regions to teacher pseudo-mask regions.
+
+**V2**
+
+> V1 with segmentation-aware hard-background sampling from pixels inside pseudo boxes but outside pseudo masks.
+
+**V3**
+
+> V2 with pseudo-mask reliability incorporated into the variance and covariance statistics of SegMARD.
+
+Và nếu mô tả progression bằng một dòng:
+
+[
+\boxed{
+BoxAware
+\rightarrow
+MaskAware
+\rightarrow
+RegionAware
+\rightarrow
+ReliabilityAware
+}
+]
