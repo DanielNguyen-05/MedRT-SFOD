@@ -1,0 +1,35 @@
+========================================================================
+DENSE MEDRT-SFSEG STAGE-2
+========================================================================
+target images : 612
+labels used   : NO
+GT masks used : NO
+epochs        : 1
+batch         : 4
+
+Mask-DHF rel  : 0.744898
+stability     : 0.4 0.6
+
+MARD lambda0  : 0.05
+MARD warmup   : 5.0
+MARD mode     : mask
+FG definition : inside Teacher pseudo segmentation mask
+FG erosion    : 1
+mask dilation : 1
+hard BG ratio : 0.0
+var/cov obj.   : unchanged
+[E01] batch=001/153 pseudo=4 loss=9.6759 seg=0.6057 semseg=0.7655 mard=1.9622 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=137.58
+[E01] batch=002/153 pseudo=4 loss=9.0599 seg=0.8604 semseg=0.3358 mard=2.0995 lambda=0.000048 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=313.92
+[E01] batch=003/153 pseudo=3 loss=32.7609 seg=3.3142 semseg=6.3086 mard=2.0403 lambda=0.000068 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 grad_preclip=389.07
+[E01] batch=004/153 pseudo=4 loss=5.3644 seg=0.4917 semseg=0.2160 mard=2.0903 lambda=0.000139 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=58.29
+[E01] batch=005/153 pseudo=4 loss=14.3687 seg=0.5905 semseg=1.8088 mard=2.0130 lambda=0.000186 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=100.77
+[E01] batch=006/153 pseudo=4 loss=18.7826 seg=2.3270 semseg=0.9531 mard=2.0367 lambda=0.000197 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=225.80
+[E01] batch=007/153 pseudo=4 loss=5.9797 seg=0.6346 semseg=0.2165 mard=2.0976 lambda=0.000299 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=119.97
+[E01] batch=008/153 pseudo=4 loss=6.8261 seg=0.4971 semseg=0.3266 mard=2.0579 lambda=0.000257 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 grad_preclip=162.58
+[E01] batch=009/153 pseudo=3 loss=5.3151 seg=0.7317 semseg=0.2828 mard=2.0920 lambda=0.000354 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 grad_preclip=80.05
+[E01] batch=010/153 pseudo=3 loss=5.5519 seg=0.6983 semseg=0.2587 mard=2.0292 lambda=0.000346 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 grad_preclip=42.70
+
+[Epoch 01] DONE time=3.8s valid=10 skipped=0 pseudo=37 anchors=32 box_extra=6 mask_extra=5 reject_rel=1 loss=11.3685 seg=1.0751 semseg=1.1472 mard=2.0519 lambda_avg=0.000190 FG/HBG/EBG=29.6/0.0/1420.8
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/segmard_mask_smoke/checkpoints/dense_sfseg_epoch_1.pt
+
+[PASS] Dense SFSeg run completed

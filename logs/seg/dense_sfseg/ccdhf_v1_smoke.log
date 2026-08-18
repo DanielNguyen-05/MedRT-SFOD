@@ -1,0 +1,40 @@
+========================================================================
+DENSE MEDRT-SFSEG STAGE-2
+========================================================================
+target images : 612
+labels used   : NO
+GT masks used : NO
+epochs        : 1
+batch         : 4
+
+DHF mode      : cc
+Mask-DHF rel  : 0.744898
+stability     : 0.4 0.6
+CC match IoU : 0.5
+CC witnesses : 5
+CC fusion    : branch-balanced consensus
+
+MARD lambda0  : 0.05
+MARD warmup   : 5.0
+MARD mode     : mask
+FG definition : inside Teacher pseudo segmentation mask
+FG erosion    : 1
+mask dilation : 1
+hard BG ratio : 0.5
+reliability wt: OFF
+var/cov obj.   : unchanged
+[E01] batch=001/153 pseudo=4 loss=9.6939 seg=0.6096 semseg=0.7655 mard=2.0006 lambda=0.000000 box_extra=2 mask_extra=1 CC=3/12 cc_shift=0.00321 cc_iou=0.99491 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.878/0.795/0.944 wmean=1.000 grad_preclip=136.38
+[E01] batch=002/153 pseudo=4 loss=9.0252 seg=0.8552 semseg=0.3343 mard=2.0279 lambda=0.000048 box_extra=0 mask_extra=0 CC=4/17 cc_shift=0.00137 cc_iou=0.99786 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.909/0.805/0.952 wmean=1.000 grad_preclip=312.01
+[E01] batch=003/153 pseudo=3 loss=32.8664 seg=3.3081 semseg=6.3596 mard=2.0622 lambda=0.000068 box_extra=0 mask_extra=0 CC=3/11 cc_shift=0.01246 cc_iou=0.98370 FG/HBG/EBG=24/192/960 fallback=0 rel=0.822/0.660/0.928 wmean=1.000 grad_preclip=392.93
+[E01] batch=004/153 pseudo=4 loss=5.3905 seg=0.4971 semseg=0.2199 mard=2.0215 lambda=0.000139 box_extra=0 mask_extra=0 CC=4/20 cc_shift=0.00172 cc_iou=0.99666 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.905/0.867/0.937 wmean=1.000 grad_preclip=58.09
+[E01] batch=005/153 pseudo=4 loss=14.3375 seg=0.5955 semseg=1.7956 mard=2.0642 lambda=0.000186 box_extra=1 mask_extra=1 CC=3/15 cc_shift=0.00272 cc_iou=0.99595 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.904/0.778/0.958 wmean=1.000 grad_preclip=100.65
+[E01] batch=006/153 pseudo=4 loss=18.1636 seg=2.2029 semseg=0.9249 mard=2.0137 lambda=0.000197 box_extra=1 mask_extra=1 CC=3/15 cc_shift=0.00415 cc_iou=0.98959 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.867/0.797/0.946 wmean=1.000 grad_preclip=223.51
+[E01] batch=007/153 pseudo=4 loss=5.9790 seg=0.6357 semseg=0.2164 mard=2.0133 lambda=0.000299 box_extra=1 mask_extra=1 CC=3/15 cc_shift=0.00102 cc_iou=0.99772 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.919/0.875/0.957 wmean=1.000 grad_preclip=118.73
+[E01] batch=008/153 pseudo=4 loss=6.8121 seg=0.4978 semseg=0.3240 mard=1.9905 lambda=0.000257 box_extra=1 mask_extra=1 CC=3/15 cc_shift=0.00134 cc_iou=0.99844 FG/HBG/EBG=32/256/1280 fallback=0 rel=0.862/0.738/0.942 wmean=1.000 grad_preclip=158.84
+[E01] batch=009/153 pseudo=3 loss=5.2616 seg=0.7145 semseg=0.2839 mard=2.0373 lambda=0.000354 box_extra=0 mask_extra=0 CC=3/13 cc_shift=0.00199 cc_iou=0.99735 FG/HBG/EBG=24/192/960 fallback=0 rel=0.901/0.793/0.959 wmean=1.000 grad_preclip=80.72
+[E01] batch=010/153 pseudo=3 loss=5.5056 seg=0.7018 semseg=0.2471 mard=2.0264 lambda=0.000346 box_extra=0 mask_extra=0 CC=3/11 cc_shift=0.00509 cc_iou=0.99288 FG/HBG/EBG=24/192/960 fallback=0 rel=0.860/0.710/0.936 wmean=1.000 grad_preclip=41.30
+
+[Epoch 01] DONE time=3.8s valid=10 skipped=0 pseudo=37 anchors=32 box_extra=6 mask_extra=5 reject_rel=1 CC=32/144 cc_fallback=0 cc_shift=0.00338 cc_iou=0.99468 loss=11.3036 seg=1.0618 semseg=1.1471 mard=2.0258 lambda_avg=0.000190 FG/HBG/EBG=29.6/236.8/1184.0 rel=0.884/0.660/0.959 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/ccdhf_v1_smoke/checkpoints/dense_sfseg_epoch_1.pt
+
+[PASS] Dense SFSeg run completed
