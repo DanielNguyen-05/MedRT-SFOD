@@ -25,14 +25,14 @@ Metrics
 -------
 Overlap / pixel metrics:
   Dice, IoU, Precision, Sensitivity, Specificity
-Boundary metrics (pixel units because CVC/Kvasir do not provide physical spacing):
-  ASD  : symmetric average surface distance
-  HD95 : 95th percentile of pooled bidirectional surface distances
+Boundary metrics:
+  ASD  : HEAL-style average surface distance, reported in mm with unit spacing (1, 1)
+  HD95 : 95th percentile of pooled bidirectional surface distances, reported in mm
 
 Empty-mask convention
 ---------------------
 - both prediction and GT empty: ASD=HD95=0
-- exactly one empty: ASD=HD95=image diagonal (finite worst-case penalty)
+- exactly one empty: ASD=HD95=image diagonal in unit-spacing mm
   and boundary_status records the case explicitly.
 """
 
@@ -50,6 +50,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.ndimage import binary_erosion, distance_transform_edt
 from ultralytics import YOLO
 
 try:
@@ -62,6 +63,9 @@ except Exception:
 
 EPS = 1e-8
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+# Match the HEAL evaluator convention: unit spacing per image axis.
+# The same spacing is used for BOTH ASD and HD95 so both are reported in mm.
+BOUNDARY_VOXEL_SPACING_MM = (1.0, 1.0)
 
 
 def div(a: float, b: float) -> float:
@@ -138,23 +142,50 @@ def binary_surface(mask: np.ndarray) -> np.ndarray:
     return np.logical_and(x.astype(bool), ~eroded.astype(bool))
 
 
-def distances_to_surface(surface: np.ndarray) -> np.ndarray:
-    """Distance from every pixel to the nearest True surface pixel."""
-    # OpenCV distanceTransform measures non-zero pixels to nearest zero pixel.
-    # Therefore encode surface pixels as 0 and everything else as 1.
-    source = (~surface.astype(bool)).astype(np.uint8)
-    return cv2.distanceTransform(
-        source,
-        distanceType=cv2.DIST_L2,
-        maskSize=cv2.DIST_MASK_PRECISE,
-    )
+def distances_to_surface_mm(
+    surface: np.ndarray,
+    voxel_spacing: tuple[float, float] = BOUNDARY_VOXEL_SPACING_MM,
+) -> np.ndarray:
+    """Euclidean distance to the nearest surface point, in mm."""
+    surface = surface.astype(bool)
+    return distance_transform_edt(~surface, sampling=voxel_spacing)
+
+
+def average_surface_distance_heal_mm(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    voxel_spacing: tuple[float, float] = BOUNDARY_VOXEL_SPACING_MM,
+) -> float:
+    """HEAL-style ASD using scipy EDT and unit spacing, reported as mm."""
+    y_true = y_true.astype(bool)
+    y_pred = y_pred.astype(bool)
+
+    if not np.any(y_true) or not np.any(y_pred):
+        return float("nan")
+
+    dist_map_true = distance_transform_edt(~y_true, sampling=voxel_spacing)
+    dist_map_pred = distance_transform_edt(~y_pred, sampling=voxel_spacing)
+
+    surface_true = np.logical_and(y_true, ~binary_erosion(y_true))
+    surface_pred = np.logical_and(y_pred, ~binary_erosion(y_pred))
+
+    sd1 = float(dist_map_true[surface_pred].mean()) if np.any(surface_pred) else float("nan")
+    sd2 = float(dist_map_pred[surface_true].mean()) if np.any(surface_true) else float("nan")
+    if np.isnan(sd1) or np.isnan(sd2):
+        return float("nan")
+
+    # Keep the HEAL repository formula exactly.
+    return float((sd1 + sd2) / 3.0)
 
 
 def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str | int]:
     p = pred.astype(bool)
     g = gt.astype(bool)
     h, w = p.shape
-    diagonal = float(math.hypot(h, w))
+    diagonal_mm = float(math.hypot(
+        h * BOUNDARY_VOXEL_SPACING_MM[0],
+        w * BOUNDARY_VOXEL_SPACING_MM[1],
+    ))
 
     p_any = bool(p.any())
     g_any = bool(g.any())
@@ -170,8 +201,8 @@ def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str |
 
     if not p_any or not g_any:
         return {
-            "asd": diagonal,
-            "hd95": diagonal,
+            "asd": diagonal_mm,
+            "hd95": diagonal_mm,
             "boundary_status": "pred_empty" if not p_any else "gt_empty",
             "pred_surface_pixels": int(binary_surface(p).sum()),
             "gt_surface_pixels": int(binary_surface(g).sum()),
@@ -183,15 +214,15 @@ def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str |
     # Defensive fallback for pathological one-pixel morphology cases.
     if not ps.any() or not gs.any():
         return {
-            "asd": diagonal,
-            "hd95": diagonal,
+            "asd": diagonal_mm,
+            "hd95": diagonal_mm,
             "boundary_status": "surface_empty",
             "pred_surface_pixels": int(ps.sum()),
             "gt_surface_pixels": int(gs.sum()),
         }
 
-    dt_to_gt = distances_to_surface(gs)
-    dt_to_pred = distances_to_surface(ps)
+    dt_to_gt = distances_to_surface_mm(gs, BOUNDARY_VOXEL_SPACING_MM)
+    dt_to_pred = distances_to_surface_mm(ps, BOUNDARY_VOXEL_SPACING_MM)
 
     d_pred_to_gt = dt_to_gt[ps]
     d_gt_to_pred = dt_to_pred[gs]
@@ -201,8 +232,12 @@ def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str |
         axis=0,
     )
 
+    asd_mm = average_surface_distance_heal_mm(
+        g, p, voxel_spacing=BOUNDARY_VOXEL_SPACING_MM
+    )
+
     return {
-        "asd": float(pooled.mean()),
+        "asd": float(asd_mm),
         "hd95": float(np.percentile(pooled, 95.0)),
         "boundary_status": "ok",
         "pred_surface_pixels": int(ps.sum()),
@@ -351,8 +386,8 @@ def save_case_panel(
         f"{image_path.name} | "
         f"Dice={float(row['dice']):.4f}  "
         f"IoU={float(row['iou']):.4f}  "
-        f"ASD={float(row['asd']):.2f}px  "
-        f"HD95={float(row['hd95']):.2f}px"
+        f"ASD={float(row['asd']):.2f}mm  "
+        f"HD95={float(row['hd95']):.2f}mm"
     )
     fig.tight_layout()
     fig.savefig(out_path, dpi=160, bbox_inches="tight")
@@ -419,7 +454,7 @@ def main() -> None:
     print("model        :", model_path)
     print("images       :", len(image_paths))
     print("GT used      : YES, EVALUATION ONLY")
-    print("ASD/HD95 unit: pixels")
+    print("ASD/HD95 unit: mm / mm")
     print("output       :", out_dir)
     print()
 
@@ -485,7 +520,7 @@ def main() -> None:
         if idx == 1 or idx % 25 == 0 or idx == len(image_paths):
             print(
                 f"[{idx:04d}/{len(image_paths):04d}] {image_path.name} "
-                f"Dice={row['dice']:.4f} ASD={row['asd']:.2f}px HD95={row['hd95']:.2f}px"
+                f"Dice={row['dice']:.4f} ASD={row['asd']:.2f}mm HD95={row['hd95']:.2f}mm"
             )
 
     metric_keys = [
@@ -524,12 +559,18 @@ def main() -> None:
         "conf": args.conf,
         "params": int(params),
         "params_M": float(params / 1e6),
-        "boundary_metric_unit": "pixels",
+        "boundary_metric_unit": "mm",
+        "boundary_metric_units": {"asd": "mm", "hd95": "mm"},
+        "boundary_voxel_spacing_mm": list(BOUNDARY_VOXEL_SPACING_MM),
         "boundary_definition": {
-            "surface": "one-pixel inner surface from 3x3 erosion",
-            "asd": "mean of pooled bidirectional surface distances",
-            "hd95": "95th percentile of pooled bidirectional surface distances",
-            "one_empty_penalty": "image diagonal",
+            "asd": (
+                "HEAL-style scipy EDT: pred-surface to GT-mask mean and "
+                "GT-surface to pred-mask mean, combined as (sd1 + sd2) / 3.0"
+            ),
+            "asd_spacing_mm": list(BOUNDARY_VOXEL_SPACING_MM),
+            "hd95": "95th percentile of pooled bidirectional surface-to-surface distances computed with scipy EDT sampling",
+            "hd95_spacing_mm": list(BOUNDARY_VOXEL_SPACING_MM),
+            "one_empty_penalty": "image diagonal in mm",
         },
         "medical_macro": macro,
         "medical_global": global_metrics,
@@ -558,28 +599,28 @@ def main() -> None:
     save_single_plot(
         [float(r["asd"]) for r in rows],
         "Per-image ASD distribution",
-        "ASD (pixels)",
+        "ASD (mm)",
         plot_dir / "asd_hist.png",
     )
     save_single_plot(
         [float(r["hd95"]) for r in rows],
         "Per-image HD95 distribution",
-        "HD95 (pixels)",
+        "HD95 (mm)",
         plot_dir / "hd95_hist.png",
     )
     save_scatter(
         [float(r["dice"]) for r in rows],
         [float(r["hd95"]) for r in rows],
         "Dice",
-        "HD95 (pixels)",
+        "HD95 (mm)",
         "Dice vs HD95",
         plot_dir / "dice_vs_hd95.png",
     )
     save_scatter(
         [float(r["asd"]) for r in rows],
         [float(r["hd95"]) for r in rows],
-        "ASD (pixels)",
-        "HD95 (pixels)",
+        "ASD (mm)",
+        "HD95 (mm)",
         "ASD vs HD95",
         plot_dir / "asd_vs_hd95.png",
     )
@@ -612,8 +653,8 @@ def main() -> None:
     print(f"Macro Precision  : {macro['precision']:.6f}")
     print(f"Macro Sensitivity: {macro['sensitivity']:.6f}")
     print(f"Macro Specificity: {macro['specificity']:.6f}")
-    print(f"Macro ASD        : {macro['asd']:.6f} px")
-    print(f"Macro HD95       : {macro['hd95']:.6f} px")
+    print(f"Macro ASD        : {macro['asd']:.6f} mm")
+    print(f"Macro HD95       : {macro['hd95']:.6f} mm")
     print(f"Params           : {params / 1e6:.3f} M")
     print("Boundary statuses:", boundary_status_counts)
     print("Saved summary    :", out_dir / "summary.json")

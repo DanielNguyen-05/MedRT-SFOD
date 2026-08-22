@@ -1,0 +1,53 @@
+==============================================================================
+MEDRT-SFSEG POST-TRAINING ANALYSIS
+==============================================================================
+model        : /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt
+images       : 612
+GT used      : YES, EVALUATION ONLY
+ASD/HD95 unit: pixels
+output       : /home/dang/MedRT-SFOD/runs/seg/analysis/cvc_durr_v1_segmard_v2
+
+[0001/0612] 1.png Dice=0.5449 ASD=17.55px HD95=65.05px
+[0025/0612] 120.png Dice=0.5496 ASD=36.26px HD95=152.00px
+[0050/0612] 143.png Dice=0.9576 ASD=1.33px HD95=3.61px
+[0075/0612] 166.png Dice=0.9526 ASD=1.80px HD95=6.36px
+[0100/0612] 189.png Dice=0.9474 ASD=1.89px HD95=4.47px
+[0125/0612] 210.png Dice=0.7300 ASD=34.55px HD95=157.90px
+[0150/0612] 233.png Dice=0.5834 ASD=38.20px HD95=96.17px
+[0175/0612] 256.png Dice=0.4400 ASD=38.05px HD95=94.25px
+[0200/0612] 279.png Dice=0.9662 ASD=0.80px HD95=2.20px
+[0225/0612] 300.png Dice=0.9645 ASD=1.41px HD95=4.00px
+[0250/0612] 323.png Dice=0.9600 ASD=1.93px HD95=4.00px
+[0275/0612] 346.png Dice=0.6117 ASD=13.46px HD95=55.89px
+[0300/0612] 369.png Dice=0.8305 ASD=3.75px HD95=10.00px
+[0325/0612] 391.png Dice=0.9610 ASD=1.27px HD95=3.00px
+[0350/0612] 413.png Dice=0.7815 ASD=8.74px HD95=23.69px
+[0375/0612] 436.png Dice=0.9340 ASD=2.87px HD95=8.00px
+[0400/0612] 459.png Dice=0.9250 ASD=2.48px HD95=5.00px
+[0425/0612] 481.png Dice=0.9014 ASD=6.21px HD95=32.71px
+[0450/0612] 503.png Dice=0.9722 ASD=2.03px HD95=11.00px
+[0475/0612] 526.png Dice=0.9625 ASD=1.62px HD95=4.00px
+[0500/0612] 549.png Dice=0.6324 ASD=26.46px HD95=87.88px
+[0525/0612] 571.png Dice=0.9113 ASD=2.22px HD95=7.62px
+[0550/0612] 594.png Dice=0.7651 ASD=8.72px HD95=38.00px
+[0575/0612] 65.png Dice=0.8960 ASD=1.90px HD95=5.39px
+[0600/0612] 88.png Dice=0.9368 ASD=2.14px HD95=5.39px
+[0612/0612] 99.png Dice=0.9653 ASD=1.44px HD95=4.50px
+
+==============================================================================
+POST-TRAINING SEGMENTATION ANALYSIS RESULTS
+==============================================================================
+Macro Dice       : 0.804231
+Macro IoU        : 0.728440
+Macro Precision  : 0.808343
+Macro Sensitivity: 0.867140
+Macro Specificity: 0.971711
+Macro ASD        : 28.466611 px
+Macro HD95       : 53.060294 px
+Params           : 10.366 M
+Boundary statuses: {'ok': 590, 'pred_empty': 22}
+Saved summary    : /home/dang/MedRT-SFOD/runs/seg/analysis/cvc_durr_v1_segmard_v2/summary.json
+Saved per-image  : /home/dang/MedRT-SFOD/runs/seg/analysis/cvc_durr_v1_segmard_v2/per_image_metrics.csv
+Saved hard cases : /home/dang/MedRT-SFOD/runs/seg/analysis/cvc_durr_v1_segmard_v2/hard_cases.csv
+Saved visuals    : /home/dang/MedRT-SFOD/runs/seg/analysis/cvc_durr_v1_segmard_v2/visualizations
+[PASS] Post-training analysis completed

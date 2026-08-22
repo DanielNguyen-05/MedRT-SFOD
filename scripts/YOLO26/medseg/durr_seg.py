@@ -1,29 +1,26 @@
-#!/usr/bin/env python3
 """
-DURR: Dual-head Uncertainty Reliability Routing for MedRT-SFSeg.
+DURR: Dual-head Uncertainty Reliability Routing for source-free segmentation.
 
-DURR is a TRAINING-ONLY module built on top of the existing BDL/Mask-DHF
-pseudo-label construction. It does not change deployment inference.
+DURR is designed to sit between Mask-DHF pseudo-label construction and the
+student/SegMARD losses.
 
-Core signals
-------------
-1) Reliable O2M Rescue:
-   When native O2O is empty, a high-confidence, high-stability O2M prediction
-   can act as a rescue supervision source. This is kept distinct from native
-   O2O and is NOT used as a fake O2O witness for BDL.
+Core routing signals (all label-free):
+  1) Reliable O2M Rescue:
+       O2O missing + high-confidence/stable O2M extra -> explicit positive
+       rescue supervision in addition to ordinary Mask-DHF inclusion.
+  2) Signed Boundary Routing:
+       matched native O2O/O2M masks produce a SIGNED disagreement
+           delta(x) = P_o2m(x) - P_o2o(x)
+       on a two-sided boundary band. Positive delta asks the student to expand;
+       negative delta asks it to shrink.
+  3) Safe Hallucination Suppression:
+       when the final Teacher pseudo set is empty, pixels with very low evidence
+       from BOTH native heads are marked safe-background. A student that creates
+       an abnormally large high-confidence foreground receives a negative loss
+       only on that safe-background subset, never on the whole image.
 
-2) Signed Boundary Routing:
-   For matched native O2O/O2M predictions, use SIGNED disagreement
-       Delta(x) = r_m P_m(x) - r_o P_o(x)
-   on a two-sided boundary band. Positive Delta encourages expansion;
-   negative Delta encourages shrinkage.
-
-3) Safe Hallucination Suppression:
-   If the final Teacher pseudo set is empty, Student foreground is penalized
-   only in pixels where BOTH Teacher heads have low foreground evidence.
-   Teacher silence is never treated as whole-image background ground truth.
-
-No target GT is used anywhere in this file.
+No target GT is read here.
+No new inference-time parameters are introduced.
 """
 
 from __future__ import annotations
@@ -35,7 +32,6 @@ import torch.nn.functional as F
 
 from ultralytics.utils.metrics import box_iou
 
-from boundary_dhf_seg import generate_boundary_dhf_pseudo_masks
 from mask_dhf_seg import (
     classwise_nms_indices,
     mask_probs_from_coefficients,
@@ -66,12 +62,12 @@ def _same_class_best_iou(
         )
 
     ious = box_iou(candidates[:, :4], anchors[:, :4])
-    same = (
+    same_class = (
         candidates[:, 5].long()[:, None]
         == anchors[:, 5].long()[None, :]
     )
     ious = torch.where(
-        same,
+        same_class,
         ious,
         torch.full_like(ious, -1.0),
     )
@@ -99,7 +95,7 @@ def _binary_dilate(mask: torch.Tensor, kernel: int) -> torch.Tensor:
     if kernel % 2 == 0:
         raise ValueError("DURR boundary kernel must be odd")
     pooled = F.max_pool2d(
-        mask.bool().float()[None, None],
+        mask.float()[None, None],
         kernel_size=kernel,
         stride=1,
         padding=kernel // 2,
@@ -107,360 +103,77 @@ def _binary_dilate(mask: torch.Tensor, kernel: int) -> torch.Tensor:
     return pooled[0, 0] > 0.5
 
 
+def _mask_iou_matrix(masks: torch.Tensor) -> torch.Tensor:
+    """Pairwise IoU for NxHxW binary masks."""
+    n = int(masks.shape[0])
+    if n == 0:
+        return masks.new_zeros((0, 0), dtype=torch.float32)
+    x = masks.bool().flatten(1)
+    inter = (x[:, None] & x[None, :]).sum(-1).float()
+    union = (x[:, None] | x[None, :]).sum(-1).float()
+    return inter / union.clamp_min(1.0)
+
+
 def _weighted_o2m_estimate(
-    probs: torch.Tensor,
-    quality: torch.Tensor,
+    witness_probs: torch.Tensor,
+    witness_quality: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Return one branch-balanced O2M probability estimate and one aggregate
-    reliability scalar. O2M multiplicity does not increase total branch mass.
-    """
-    w = quality.float().clamp_min(EPS)
+    """Return aggregate O2M probability and normalized witness weights."""
+    w = witness_quality.float().clamp_min(EPS)
     w = w / w.sum().clamp_min(EPS)
-    p = (probs.float() * w[:, None, None]).sum(dim=0)
+    p = (witness_probs.float() * w[:, None, None]).sum(dim=0)
     return p, w
 
 
-def _max_prob_evidence(
-    rows: torch.Tensor,
-    proto: torch.Tensor,
-    input_h: int,
-    input_w: int,
-    conf_floor: float,
+def _union_or_zero(
+    masks: torch.Tensor,
+    h: int,
+    w: int,
+    *,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    if masks is None or masks.numel() == 0 or masks.shape[0] == 0:
+        return torch.zeros((h, w), dtype=dtype, device=device)
+    return masks.float().amax(dim=0).to(dtype=dtype)
+
+
+def extract_student_semseg_logits(
+    student_outputs: dict[str, Any],
 ) -> torch.Tensor:
     """
-    Conservative raw Teacher evidence for safe-background construction.
-    Uses low confidence floor, not only accepted pseudo labels.
+    Return differentiable semantic logits Bx1xHxW from Segment26 training output.
+
+    Segment26 stores Proto26 output in each branch. The O2M branch keeps the
+    non-detached tuple (instance prototypes, semantic logits), while the O2O
+    branch receives a detached copy. We therefore use O2M semantic logits as
+    the shared differentiable pixel field for DURR auxiliary supervision.
     """
-    mh, mw = int(proto.shape[-2]), int(proto.shape[-1])
-    if rows.numel() == 0:
-        return proto.new_zeros((mh, mw))
+    if not isinstance(student_outputs, dict):
+        raise RuntimeError("DURR expects training-mode dual-head output dict")
+    if "one2many" not in student_outputs:
+        raise RuntimeError("DURR requires native one2many branch")
 
-    rows = rows[rows[:, 4] >= conf_floor]
-    if rows.numel() == 0:
-        return proto.new_zeros((mh, mw))
-
-    probs = mask_probs_from_coefficients(
-        rows,
-        proto,
-        input_h,
-        input_w,
-    )
-    if probs.numel() == 0:
-        return proto.new_zeros((mh, mw))
-    return probs.amax(dim=0)
-
-
-@torch.no_grad()
-def build_durr_routes(
-    teacher,
-    weak_imgs: torch.Tensor,
-    final_pseudo_labels: list[torch.Tensor],
-    *,
-    tau_o2o: float = 0.5,
-    tau_o2m: float = 0.5,
-    tau_dup: float = 0.7,
-    tau_match: float = 0.5,
-    max_witnesses: int = 5,
-    mask_threshold: float = 0.5,
-    stability_low: float = 0.40,
-    stability_high: float = 0.60,
-    reliability_threshold: float = 0.744898,
-    min_mask_pixels: int = 16,
-    boundary_kernel: int = 5,
-    direction_min_abs: float = 0.03,
-    rescue_conf: float = 0.80,
-    rescue_stability: float = 0.80,
-    evidence_conf_floor: float = 0.10,
-    safe_bg_teacher_prob: float = 0.15,
-) -> tuple[list[dict[str, torch.Tensor | bool]], dict[str, Any]]:
-    """
-    Build label-free routing maps from native Teacher O2O/O2M outputs.
-
-    NOTE: This performs one Teacher forward. generate_durr_pseudo_masks()
-    intentionally keeps the old BDL pseudo construction unchanged and calls
-    this function separately. The extra Teacher forward makes DURR-v1 easy to
-    audit. It can be fused into one forward later after validation.
-    """
-    teacher.eval()
-    outputs = teacher(
-        weak_imgs,
-        augment=False,
-        visualize=False,
-    )
-    if not (isinstance(outputs, tuple) and len(outputs) == 2):
-        raise RuntimeError("Unexpected Teacher output in DURR")
-
-    first, branches = outputs
-    if not (
-        isinstance(first, tuple)
-        and len(first) == 2
-        and isinstance(branches, dict)
-    ):
-        raise RuntimeError("Expected ((O2O, proto), branches) in DURR")
-
-    final_o2o, proto = first
-    if isinstance(proto, (tuple, list)):
-        proto = proto[0]
-
-    head = teacher.model[-1]
-    decoded_o2m = head._inference(
-        branches["one2many"]
-    ).permute(0, 2, 1)
-    final_o2m = head.postprocess(decoded_o2m)
-
-    input_h = int(weak_imgs.shape[2])
-    input_w = int(weak_imgs.shape[3])
-
-    routes: list[dict[str, torch.Tensor | bool]] = []
-    totals: dict[str, Any] = {
-        "durr_direction_images": 0,
-        "durr_direction_pixels": 0,
-        "durr_signed_abs_sum": 0.0,
-        "durr_signed_abs_count": 0,
-        "durr_positive_direction_pixels": 0,
-        "durr_negative_direction_pixels": 0,
-        "durr_rescue_images": 0,
-        "durr_rescue_instances": 0,
-        "durr_rescue_pixels": 0,
-        "durr_teacher_empty_images": 0,
-        "durr_safe_bg_pixels": 0,
-    }
-
-    for i in range(weak_imgs.shape[0]):
-        rows_o2o_all = final_o2o[i]
-        rows_o2m_all = final_o2m[i]
-
-        # Low-threshold evidence is used ONLY for safe-background gating.
-        o2o_evidence = _max_prob_evidence(
-            rows_o2o_all,
-            proto[i],
-            input_h,
-            input_w,
-            evidence_conf_floor,
+    proto = student_outputs["one2many"].get("proto", None)
+    if not (isinstance(proto, (tuple, list)) and len(proto) == 2):
+        raise RuntimeError(
+            "DURR requires Segment26 Proto26 output "
+            "(instance prototypes, semantic logits)"
         )
-        o2m_evidence = _max_prob_evidence(
-            rows_o2m_all,
-            proto[i],
-            input_h,
-            input_w,
-            evidence_conf_floor,
+    sem = proto[1]
+    if not isinstance(sem, torch.Tensor) or sem.ndim != 4:
+        raise RuntimeError("Unexpected DURR semantic-logit tensor")
+    if sem.shape[1] != 1:
+        raise RuntimeError(
+            "DURR-v1 is implemented for the current single-class polyp setup"
         )
-
-        anchors = rows_o2o_all[rows_o2o_all[:, 4] >= tau_o2o]
-        candidates = rows_o2m_all[rows_o2m_all[:, 4] >= tau_o2m]
-
-        anchor_probs = mask_probs_from_coefficients(
-            anchors,
-            proto[i],
-            input_h,
-            input_w,
-        )
-        anchor_masks = anchor_probs >= mask_threshold
-        if anchors.numel():
-            keep = anchor_masks.sum(dim=(1, 2)) >= min_mask_pixels
-            anchors = anchors[keep]
-            anchor_probs = anchor_probs[keep]
-            anchor_masks = anchor_masks[keep]
-
-        anchor_stab = mask_stability(
-            anchor_probs,
-            low=stability_low,
-            high=stability_high,
-        )
-        anchor_rel = torch.sqrt(
-            (anchors[:, 4] * anchor_stab).clamp_min(0.0)
-        )
-
-        candidate_probs = mask_probs_from_coefficients(
-            candidates,
-            proto[i],
-            input_h,
-            input_w,
-        )
-        candidate_masks = candidate_probs >= mask_threshold
-        if candidates.numel():
-            keep = candidate_masks.sum(dim=(1, 2)) >= min_mask_pixels
-            candidates = candidates[keep]
-            candidate_probs = candidate_probs[keep]
-            candidate_masks = candidate_masks[keep]
-
-        candidate_stab = mask_stability(
-            candidate_probs,
-            low=stability_low,
-            high=stability_high,
-        )
-        candidate_quality = (
-            candidates[:, 4] * candidate_stab
-        ).clamp_min(0.0)
-        candidate_rel = torch.sqrt(candidate_quality)
-
-        mh, mw = int(proto.shape[-2]), int(proto.shape[-1])
-        signed_map = proto.new_zeros((mh, mw))
-        direction_weight = proto.new_zeros((mh, mw))
-        anchor_reference = proto.new_zeros((mh, mw))
-        direction_band = torch.zeros(
-            (mh, mw), device=proto.device, dtype=torch.bool
-        )
-
-        best_iou, best_anchor_idx = _same_class_best_iou(
-            candidates,
-            anchors,
-        )
-        matched = (
-            (best_anchor_idx >= 0)
-            & (best_iou >= tau_match)
-        )
-
-        # ------------------------------------------------------------
-        # A. Signed native cross-head boundary routing.
-        # ------------------------------------------------------------
-        for anchor_idx in range(anchors.shape[0]):
-            witness_ids = torch.where(
-                matched & (best_anchor_idx == anchor_idx)
-            )[0]
-            if witness_ids.numel() == 0:
-                continue
-
-            selection = (
-                best_iou[witness_ids]
-                * candidate_rel[witness_ids]
-            )
-            order = torch.argsort(selection, descending=True)
-            witness_ids = witness_ids[order]
-            if max_witnesses > 0:
-                witness_ids = witness_ids[:max_witnesses]
-
-            wp = candidate_probs[witness_ids]
-            wq = candidate_quality[witness_ids]
-            o2m_est, norm_w = _weighted_o2m_estimate(wp, wq)
-            witness_rel = (
-                candidate_rel[witness_ids] * norm_w
-            ).sum().clamp(0.0, 1.0)
-
-            po = anchor_probs[anchor_idx].float()
-            ro = anchor_rel[anchor_idx].float().clamp(0.0, 1.0)
-            rm = witness_rel.float()
-
-            signed = (
-                rm * o2m_est.float()
-                - ro * po
-            ).clamp(-1.0, 1.0)
-
-            hard = anchor_masks[anchor_idx]
-            eroded = _binary_erode(hard, boundary_kernel)
-            dilated = _binary_dilate(hard, boundary_kernel)
-            band = dilated & (~eroded)
-
-            abs_signed = signed.abs()
-            mask = band & (abs_signed >= direction_min_abs)
-            if not mask.any():
-                continue
-
-            reliability_pair = torch.sqrt(
-                (ro * rm).clamp_min(0.0)
-            )
-            local_weight = (
-                abs_signed * reliability_pair
-            ).clamp(0.0, 1.0)
-
-            # If multiple objects overlap, keep the route with higher weight.
-            replace = mask & (local_weight > direction_weight)
-            signed_map[replace] = signed[replace]
-            direction_weight[replace] = local_weight[replace]
-            anchor_reference[replace] = po[replace]
-            direction_band |= mask
-
-        if direction_band.any():
-            vals = signed_map[direction_band]
-            totals["durr_direction_images"] += 1
-            totals["durr_direction_pixels"] += int(direction_band.sum().item())
-            totals["durr_positive_direction_pixels"] += int((vals > 0).sum().item())
-            totals["durr_negative_direction_pixels"] += int((vals < 0).sum().item())
-            totals["durr_signed_abs_sum"] += float(vals.abs().sum().item())
-            totals["durr_signed_abs_count"] += int(vals.numel())
-
-        # ------------------------------------------------------------
-        # B. Reliable O2M rescue (only when native O2O has no anchor).
-        # This does NOT become fake O2O for BDL.
-        # ------------------------------------------------------------
-        rescue_prob = proto.new_zeros((mh, mw))
-        rescue_mask = torch.zeros(
-            (mh, mw), device=proto.device, dtype=torch.bool
-        )
-        rescue_count = 0
-
-        if anchors.shape[0] == 0 and candidates.shape[0] > 0:
-            rescue_ok = (
-                (candidates[:, 4] >= rescue_conf)
-                & (candidate_stab >= rescue_stability)
-                & (candidate_rel >= reliability_threshold)
-            )
-            rescue_ids = torch.where(rescue_ok)[0]
-
-            if rescue_ids.numel():
-                rescue_rows = candidates[rescue_ids]
-                keep = classwise_nms_indices(
-                    rescue_rows,
-                    tau_dup,
-                )
-                rescue_ids = rescue_ids[keep]
-
-                if rescue_ids.numel():
-                    rp = candidate_probs[rescue_ids]
-                    rescue_prob = rp.amax(dim=0)
-                    rescue_mask = rescue_prob >= mask_threshold
-                    rescue_count = int(rescue_ids.numel())
-
-        if rescue_mask.any():
-            totals["durr_rescue_images"] += 1
-            totals["durr_rescue_instances"] += rescue_count
-            totals["durr_rescue_pixels"] += int(rescue_mask.sum().item())
-
-        # ------------------------------------------------------------
-        # C. Safe background for hallucination suppression.
-        # Final Teacher pseudo empty != whole image background.
-        # ------------------------------------------------------------
-        teacher_empty = (
-            i >= len(final_pseudo_labels)
-            or final_pseudo_labels[i].shape[0] == 0
-        )
-        if teacher_empty:
-            totals["durr_teacher_empty_images"] += 1
-
-        safe_bg = (
-            (o2o_evidence < safe_bg_teacher_prob)
-            & (o2m_evidence < safe_bg_teacher_prob)
-        )
-        totals["durr_safe_bg_pixels"] += int(safe_bg.sum().item())
-
-        routes.append(
-            {
-                "signed_direction": signed_map.detach(),
-                "direction_weight": direction_weight.detach(),
-                "direction_band": direction_band.detach(),
-                "anchor_reference": anchor_reference.detach(),
-                "rescue_prob": rescue_prob.detach(),
-                "rescue_mask": rescue_mask.detach(),
-                "safe_background": safe_bg.detach(),
-                "teacher_o2o_evidence": o2o_evidence.detach(),
-                "teacher_o2m_evidence": o2m_evidence.detach(),
-                "teacher_empty": bool(teacher_empty),
-            }
-        )
-
-    totals["durr_signed_abs_mean"] = (
-        totals["durr_signed_abs_sum"]
-        / max(totals["durr_signed_abs_count"], 1)
-    )
-    return routes, totals
+    return sem
 
 
 @torch.no_grad()
 def generate_durr_pseudo_masks(
     teacher,
     weak_imgs: torch.Tensor,
-    *,
     tau_o2o: float = 0.5,
     tau_o2m: float = 0.5,
     tau_no: float = 0.2,
@@ -472,300 +185,711 @@ def generate_durr_pseudo_masks(
     stability_high: float = 0.60,
     reliability_threshold: float = 0.744898,
     min_mask_pixels: int = 16,
-    bdl_boundary_kernel: int = 3,
-    durr_boundary_kernel: int = 5,
-    durr_direction_min_abs: float = 0.03,
-    durr_rescue_conf: float = 0.80,
-    durr_rescue_stability: float = 0.80,
-    durr_evidence_conf_floor: float = 0.10,
-    durr_safe_bg_teacher_prob: float = 0.15,
+    boundary_kernel: int = 5,
+    route_gain: float = 1.0,
+    route_min_disagreement: float = 0.02,
+    rescue_conf: float = 0.80,
+    rescue_stability: float = 0.80,
+    rescue_consensus_iou: float = 0.70,
+    rescue_min_support: int = 0,
+    evidence_conf: float = 0.10,
+    safe_bg_teacher_prob: float = 0.10,
 ):
     """
-    DURR-v1 deliberately leaves the validated BDL/Mask-DHF pseudo population
-    unchanged. DURR adds routed auxiliary supervision on top.
+    Build standard hard Mask-DHF pseudo masks plus DURR routing maps.
 
-    Returns:
-      labels
-      supervision_masks
-      geometry_masks
-      instance_reliability
-      totals
-      routes
+    Returns
+    -------
+    labels_out
+        Final hard pseudo rows (O2O anchors + reliable novel O2M extras).
+    masks_out
+        Hard geometry masks used by the native student criterion and SegMARD.
+    instance_reliability_out
+        sqrt(confidence * threshold-stability), aligned to labels/masks.
+    totals
+        Aggregate label-free diagnostics.
+    routes_out
+        One dict per image:
+          directional_target : desired probability in signed boundary band
+          directional_weight : reliability * |signed disagreement|
+          signed_delta       : P_o2m - P_o2o
+          rescue_mask        : reliable high-trust O2M rescue foreground
+          rescue_weight      : rescue confidence map
+          safe_bg_mask       : consensus-low-evidence background
+          teacher_evidence   : max raw-head soft evidence
+          teacher_empty      : whether final pseudo set is empty
     """
-    base = generate_boundary_dhf_pseudo_masks(
-        teacher=teacher,
-        weak_imgs=weak_imgs,
-        tau_o2o=tau_o2o,
-        tau_o2m=tau_o2m,
-        tau_no=tau_no,
-        tau_dup=tau_dup,
-        tau_match=tau_match,
-        max_witnesses=max_witnesses,
-        mask_threshold=mask_threshold,
-        stability_low=stability_low,
-        stability_high=stability_high,
-        reliability_threshold=reliability_threshold,
-        min_mask_pixels=min_mask_pixels,
-        boundary_kernel=bdl_boundary_kernel,
-        return_debug=False,
-    )
-    (
-        labels,
-        supervision_masks,
-        geometry_masks,
-        instance_reliability,
-        totals,
-    ) = base
+    if tau_no > tau_match:
+        raise ValueError("DURR requires tau_no <= tau_match")
+    if boundary_kernel < 1 or boundary_kernel % 2 == 0:
+        raise ValueError("boundary_kernel must be positive odd")
+    if max_witnesses < 0:
+        raise ValueError("max_witnesses must be >= 0")
 
-    routes, durr_totals = build_durr_routes(
-        teacher=teacher,
-        weak_imgs=weak_imgs,
-        final_pseudo_labels=labels,
-        tau_o2o=tau_o2o,
-        tau_o2m=tau_o2m,
-        tau_dup=tau_dup,
-        tau_match=tau_match,
-        max_witnesses=max_witnesses,
-        mask_threshold=mask_threshold,
-        stability_low=stability_low,
-        stability_high=stability_high,
-        reliability_threshold=reliability_threshold,
-        min_mask_pixels=min_mask_pixels,
-        boundary_kernel=durr_boundary_kernel,
-        direction_min_abs=durr_direction_min_abs,
-        rescue_conf=durr_rescue_conf,
-        rescue_stability=durr_rescue_stability,
-        evidence_conf_floor=durr_evidence_conf_floor,
-        safe_bg_teacher_prob=durr_safe_bg_teacher_prob,
+    teacher.eval()
+    outputs = teacher(
+        weak_imgs,
+        augment=False,
+        visualize=False,
     )
-    totals = dict(totals)
-    totals.update(durr_totals)
+    if not (isinstance(outputs, tuple) and len(outputs) == 2):
+        raise RuntimeError("Unexpected Teacher output")
+
+    first, branches = outputs
+    if not (isinstance(first, tuple) and len(first) == 2):
+        raise RuntimeError("Expected ((O2O, proto), branches)")
+
+    final_o2o, proto = first
+    if isinstance(proto, (tuple, list)):
+        proto = proto[0]
+    if not isinstance(branches, dict):
+        raise RuntimeError("Missing Teacher branch dictionary")
+
+    head = teacher.model[-1]
+    decoded_o2m = head._inference(
+        branches["one2many"]
+    ).permute(0, 2, 1)
+    final_o2m = head.postprocess(decoded_o2m)
+
+    input_h = int(weak_imgs.shape[2])
+    input_w = int(weak_imgs.shape[3])
+    mh, mw = int(proto.shape[-2]), int(proto.shape[-1])
+
+    labels_out: list[torch.Tensor] = []
+    masks_out: list[torch.Tensor] = []
+    instance_reliability_out: list[torch.Tensor] = []
+    routes_out: list[dict[str, Any]] = []
+
+    totals: dict[str, Any] = {
+        "anchors": 0,
+        "candidates": 0,
+        "box_dhf_extras": 0,
+        "mask_dhf_extras": 0,
+        "rejected_reliability": 0,
+        "pseudo": 0,
+        "durr_matched_anchors": 0,
+        "durr_witnesses": 0,
+        "durr_direction_pixels": 0,
+        "durr_abs_delta_sum": 0.0,
+        "durr_abs_delta_count": 0,
+        "durr_expand_pixels": 0,
+        "durr_shrink_pixels": 0,
+        "durr_rescue_instances": 0,
+        "durr_rescue_images": 0,
+        "durr_teacher_empty_images": 0,
+        "durr_safe_bg_pixels": 0,
+    }
+
+    for bi in range(weak_imgs.shape[0]):
+        raw_o2o = final_o2o[bi]
+        raw_o2m = final_o2m[bi]
+
+        # ------------------------------------------------------------
+        # Low-threshold raw-head evidence for SAFE background.
+        # This is deliberately broader than the pseudo-label thresholds.
+        # ------------------------------------------------------------
+        ev_o2o = raw_o2o[raw_o2o[:, 4] >= evidence_conf]
+        ev_o2m = raw_o2m[raw_o2m[:, 4] >= evidence_conf]
+
+        ev_o2o_probs = mask_probs_from_coefficients(
+            ev_o2o, proto[bi], input_h, input_w
+        )
+        ev_o2m_probs = mask_probs_from_coefficients(
+            ev_o2m, proto[bi], input_h, input_w
+        )
+
+        teacher_evidence = torch.zeros(
+            (mh, mw), device=proto.device, dtype=torch.float32
+        )
+        if ev_o2o_probs.numel():
+            teacher_evidence = torch.maximum(
+                teacher_evidence,
+                ev_o2o_probs.float().amax(dim=0),
+            )
+        if ev_o2m_probs.numel():
+            teacher_evidence = torch.maximum(
+                teacher_evidence,
+                ev_o2m_probs.float().amax(dim=0),
+            )
+
+        safe_bg_mask = teacher_evidence < safe_bg_teacher_prob
+
+        # ------------------------------------------------------------
+        # Standard pseudo candidates.
+        # ------------------------------------------------------------
+        anchors = raw_o2o[raw_o2o[:, 4] >= tau_o2o]
+        candidates = raw_o2m[raw_o2m[:, 4] >= tau_o2m]
+
+        anchor_probs = mask_probs_from_coefficients(
+            anchors, proto[bi], input_h, input_w
+        )
+        anchor_masks = anchor_probs >= mask_threshold
+
+        if anchors.numel():
+            keep = anchor_masks.sum(dim=(1, 2)) >= min_mask_pixels
+            anchors = anchors[keep]
+            anchor_probs = anchor_probs[keep]
+            anchor_masks = anchor_masks[keep]
+
+        anchor_stability = mask_stability(
+            anchor_probs,
+            low=stability_low,
+            high=stability_high,
+        )
+        anchor_quality = (
+            anchors[:, 4] * anchor_stability
+        ).clamp_min(0.0)
+        anchor_reliability = torch.sqrt(anchor_quality)
+        totals["anchors"] += int(anchors.shape[0])
+
+        candidate_probs = mask_probs_from_coefficients(
+            candidates, proto[bi], input_h, input_w
+        )
+        candidate_masks = candidate_probs >= mask_threshold
+
+        if candidates.numel():
+            valid = candidate_masks.sum(dim=(1, 2)) >= min_mask_pixels
+            candidates = candidates[valid]
+            candidate_probs = candidate_probs[valid]
+            candidate_masks = candidate_masks[valid]
+
+        candidate_stability = mask_stability(
+            candidate_probs,
+            low=stability_low,
+            high=stability_high,
+        )
+        candidate_quality = (
+            candidates[:, 4] * candidate_stability
+        ).clamp_min(0.0)
+        candidate_reliability = torch.sqrt(candidate_quality)
+        totals["candidates"] += int(candidates.shape[0])
+
+        best_iou, best_anchor_idx = _same_class_best_iou(
+            candidates, anchors
+        )
+        matched = (
+            (best_anchor_idx >= 0)
+            & (best_iou >= tau_match)
+        )
+        if anchors.shape[0] == 0:
+            coverage = torch.ones(
+                candidates.shape[0],
+                dtype=torch.bool,
+                device=candidates.device,
+            )
+        else:
+            coverage = best_iou <= tau_no
+
+        # ------------------------------------------------------------
+        # Signed directional routing from native cross-head evidence.
+        # ------------------------------------------------------------
+        signed_delta_map = torch.zeros(
+            (mh, mw), device=proto.device, dtype=torch.float32
+        )
+        directional_weight = torch.zeros_like(signed_delta_map)
+        directional_target = torch.zeros_like(signed_delta_map)
+        o2m_witness_map = torch.zeros_like(signed_delta_map)
+
+        for anchor_idx in range(anchors.shape[0]):
+            witness_ids = torch.where(
+                matched & (best_anchor_idx == anchor_idx)
+            )[0]
+            if witness_ids.numel() == 0:
+                continue
+
+            selection_score = (
+                best_iou[witness_ids]
+                * candidate_reliability[witness_ids]
+            )
+            order = torch.argsort(selection_score, descending=True)
+            witness_ids = witness_ids[order]
+            if max_witnesses > 0:
+                witness_ids = witness_ids[:max_witnesses]
+
+            witness_probs = candidate_probs[witness_ids]
+            witness_quality = candidate_quality[witness_ids]
+            o2m_est, witness_w = _weighted_o2m_estimate(
+                witness_probs,
+                witness_quality,
+            )
+            o2m_witness_map = torch.maximum(
+                o2m_witness_map,
+                o2m_est.float(),
+            )
+
+            # Aggregate O2M reliability under the same normalized witness weights.
+            witness_rel = candidate_reliability[witness_ids]
+            o2m_rel = (witness_w * witness_rel.float()).sum()
+            pair_rel = torch.sqrt(
+                (
+                    anchor_reliability[anchor_idx].float()
+                    * o2m_rel.float()
+                ).clamp_min(0.0)
+            )
+
+            delta = (
+                o2m_est.float()
+                - anchor_probs[anchor_idx].float()
+            )
+
+            hard = anchor_masks[anchor_idx]
+            inner = _binary_erode(hard, boundary_kernel)
+            outer = _binary_dilate(hard, boundary_kernel)
+            band = outer & (~inner)
+
+            active = (
+                band
+                & (delta.abs() >= route_min_disagreement)
+            )
+            if not active.any():
+                continue
+
+            local_w = delta.abs() * pair_rel
+            # If several objects overlap, keep the strongest route per pixel.
+            replace = active & (local_w > directional_weight)
+            signed_delta_map[replace] = delta[replace]
+            directional_weight[replace] = local_w[replace]
+            directional_target[replace] = torch.clamp(
+                anchor_probs[anchor_idx][replace].float()
+                + route_gain * delta[replace],
+                0.0,
+                1.0,
+            )
+
+            totals["durr_matched_anchors"] += 1
+            totals["durr_witnesses"] += int(witness_ids.numel())
+            totals["durr_direction_pixels"] += int(active.sum().item())
+            abs_d = delta[active].abs()
+            totals["durr_abs_delta_sum"] += float(abs_d.sum().item())
+            totals["durr_abs_delta_count"] += int(abs_d.numel())
+            totals["durr_expand_pixels"] += int(
+                (active & (delta > 0)).sum().item()
+            )
+            totals["durr_shrink_pixels"] += int(
+                (active & (delta < 0)).sum().item()
+            )
+
+        # ------------------------------------------------------------
+        # Original Mask-DHF coverage.
+        # ------------------------------------------------------------
+        coverage_candidates = candidates[coverage]
+        coverage_probs = candidate_probs[coverage]
+        coverage_stab = candidate_stability[coverage]
+
+        if coverage_candidates.numel():
+            keep = classwise_nms_indices(
+                coverage_candidates,
+                tau_dup,
+            )
+            coverage_candidates = coverage_candidates[keep]
+            coverage_probs = coverage_probs[keep]
+            coverage_stab = coverage_stab[keep]
+
+        totals["box_dhf_extras"] += int(
+            coverage_candidates.shape[0]
+        )
+
+        if coverage_candidates.numel():
+            coverage_quality = (
+                coverage_candidates[:, 4]
+                * coverage_stab
+            ).clamp_min(0.0)
+            coverage_reliability = torch.sqrt(coverage_quality)
+            reliable = coverage_reliability >= reliability_threshold
+
+            totals["rejected_reliability"] += int(
+                (~reliable).sum().item()
+            )
+
+            extras = coverage_candidates[reliable]
+            extra_probs = coverage_probs[reliable]
+            extra_stab = coverage_stab[reliable]
+            extra_rel = coverage_reliability[reliable]
+            extra_masks = (
+                extra_probs >= mask_threshold
+            ).float()
+        else:
+            extras = coverage_candidates
+            extra_probs = proto.new_zeros((0, mh, mw))
+            extra_stab = proto.new_zeros((0,))
+            extra_rel = proto.new_zeros((0,))
+            extra_masks = proto.new_zeros((0, mh, mw))
+
+        totals["mask_dhf_extras"] += int(extras.shape[0])
+
+        # ------------------------------------------------------------
+        # Reliable O2M Rescue: promotion changes AUXILIARY supervision
+        # strength, not branch identity. These remain native O2M predictions.
+        # ------------------------------------------------------------
+        rescue_mask = torch.zeros(
+            (mh, mw), device=proto.device, dtype=torch.float32
+        )
+        rescue_weight = torch.zeros_like(rescue_mask)
+        rescue_count = 0
+
+        if anchors.shape[0] == 0 and extras.shape[0] > 0:
+            extra_consensus_support = torch.zeros(
+                (extras.shape[0],),
+                dtype=torch.long,
+                device=extras.device,
+            )
+            if extras.shape[0] > 1:
+                miou = _mask_iou_matrix(extra_masks > 0.5)
+                eye = torch.eye(
+                    extras.shape[0],
+                    device=extras.device,
+                    dtype=torch.bool,
+                )
+                support = (miou >= rescue_consensus_iou) & (~eye)
+                extra_consensus_support = support.sum(dim=1)
+
+            promote = (
+                (extras[:, 4] >= rescue_conf)
+                & (extra_stab >= rescue_stability)
+                & (extra_consensus_support >= rescue_min_support)
+            )
+            if promote.any():
+                promoted_masks = extra_masks[promote]
+                promoted_rel = extra_rel[promote]
+                # Per-pixel strongest promoted reliability.
+                for mi in range(promoted_masks.shape[0]):
+                    m = promoted_masks[mi] > 0.5
+                    rescue_mask[m] = 1.0
+                    rescue_weight[m] = torch.maximum(
+                        rescue_weight[m],
+                        promoted_rel[mi].float(),
+                    )
+                rescue_count = int(promote.sum().item())
+                totals["durr_rescue_instances"] += rescue_count
+                totals["durr_rescue_images"] += 1
+
+        # ------------------------------------------------------------
+        # Standard final hard pseudo population.
+        # ------------------------------------------------------------
+        if anchors.numel() and extras.numel():
+            fused = torch.cat([anchors, extras], dim=0)
+            fused_masks = torch.cat(
+                [anchor_masks.float(), extra_masks],
+                dim=0,
+            )
+            fused_rel = torch.cat(
+                [anchor_reliability, extra_rel],
+                dim=0,
+            )
+        elif anchors.numel():
+            fused = anchors
+            fused_masks = anchor_masks.float()
+            fused_rel = anchor_reliability
+        else:
+            fused = extras
+            fused_masks = extra_masks
+            fused_rel = extra_rel
+
+        if fused.numel():
+            order = torch.argsort(fused[:, 4], descending=True)
+            fused = fused[order]
+            fused_masks = fused_masks[order]
+            fused_rel = fused_rel[order]
+
+        if not (
+            fused.shape[0]
+            == fused_masks.shape[0]
+            == fused_rel.shape[0]
+        ):
+            raise RuntimeError("DURR pseudo alignment failure")
+
+        teacher_empty = fused.shape[0] == 0
+        if teacher_empty:
+            totals["durr_teacher_empty_images"] += 1
+        totals["durr_safe_bg_pixels"] += int(
+            safe_bg_mask.sum().item()
+        )
+        totals["pseudo"] += int(fused.shape[0])
+
+        labels_out.append(fused)
+        masks_out.append(fused_masks)
+        instance_reliability_out.append(fused_rel)
+
+        o2o_union = _union_or_zero(
+            anchor_masks.float(),
+            mh,
+            mw,
+            dtype=torch.float32,
+            device=proto.device,
+        )
+        fused_union = _union_or_zero(
+            fused_masks,
+            mh,
+            mw,
+            dtype=torch.float32,
+            device=proto.device,
+        )
+
+        routes_out.append(
+            {
+                "o2o_union":
+                    o2o_union.detach(),
+                "o2m_witness":
+                    o2m_witness_map.detach(),
+                "fused_union":
+                    fused_union.detach(),
+                "directional_target":
+                    directional_target.detach(),
+                "directional_weight":
+                    directional_weight.detach(),
+                "signed_delta":
+                    signed_delta_map.detach(),
+                "rescue_mask":
+                    rescue_mask.detach(),
+                "rescue_weight":
+                    rescue_weight.detach(),
+                "safe_bg_mask":
+                    safe_bg_mask.detach(),
+                "teacher_evidence":
+                    teacher_evidence.detach(),
+                "teacher_empty":
+                    bool(teacher_empty),
+                "rescue_instances":
+                    int(rescue_count),
+            }
+        )
+
+    totals["durr_abs_delta_mean"] = (
+        totals["durr_abs_delta_sum"]
+        / max(totals["durr_abs_delta_count"], 1)
+    )
+
     return (
-        labels,
-        supervision_masks,
-        geometry_masks,
-        instance_reliability,
+        labels_out,
+        masks_out,
+        instance_reliability_out,
         totals,
-        routes,
+        routes_out,
     )
 
 
-def extract_student_semantic_logits(
-    student_outputs,
-) -> torch.Tensor:
-    """
-    Extract differentiable Proto26 semantic foreground logits from the native
-    one-to-many branch. Expected shape: [B, C, H, W]. For single-class polyp,
-    C=1.
-    """
-    if not isinstance(student_outputs, dict):
-        raise RuntimeError(
-            f"DURR expected Student training output dict, got {type(student_outputs)}"
-        )
-
-    branch = student_outputs.get("one2many")
-    if not isinstance(branch, dict):
-        raise RuntimeError("DURR missing Student one2many branch")
-
-    proto = branch.get("proto")
-    if not (
-        isinstance(proto, (tuple, list))
-        and len(proto) == 2
-        and isinstance(proto[1], torch.Tensor)
-    ):
-        raise RuntimeError(
-            "DURR requires Proto26 semantic logits in one2many['proto']=(proto, sem_logits)"
-        )
-
-    logits = proto[1]
-    if logits.ndim != 4:
-        raise RuntimeError(
-            f"DURR semantic logits must be [B,C,H,W], got {tuple(logits.shape)}"
-        )
-    if logits.shape[1] != 1:
-        raise RuntimeError(
-            "DURR-v1 is implemented for single-class polyp segmentation "
-            f"(got C={logits.shape[1]})."
-        )
-    return logits[:, 0]
-
-
-def _resize_route_map(
+def _resize_map(
     x: torch.Tensor,
-    hw: tuple[int, int],
+    size: tuple[int, int],
     *,
-    binary: bool = False,
+    mode: str,
 ) -> torch.Tensor:
     y = x.float()[None, None]
-    if tuple(y.shape[-2:]) == tuple(hw):
-        out = y[0, 0]
-    elif binary:
-        out = F.interpolate(
+    if tuple(y.shape[-2:]) == tuple(size):
+        return y[0, 0]
+    if mode == "nearest":
+        return F.interpolate(
             y,
-            size=hw,
+            size=size,
             mode="nearest",
         )[0, 0]
-    else:
-        out = F.interpolate(
-            y,
-            size=hw,
-            mode="bilinear",
-            align_corners=False,
-        )[0, 0]
-    return out
+    return F.interpolate(
+        y,
+        size=size,
+        mode="bilinear",
+        align_corners=False,
+    )[0, 0]
 
 
-def compute_durr_loss(
-    student_outputs,
-    routes: list[dict[str, torch.Tensor | bool]],
-    *,
-    direction_margin: float = 0.05,
-    lambda_direction: float = 0.20,
-    lambda_rescue: float = 0.50,
-    lambda_hallucination: float = 0.20,
-    hall_student_prob: float = 0.70,
-    hall_area_threshold: float = 0.10,
-    warmup_scale: float = 1.0,
+def compute_directional_routing_loss(
+    student_outputs: dict[str, Any],
+    routes: list[dict[str, Any]],
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """
-    Compute differentiable DURR losses on Student semantic logits.
+    Reliability-weighted signed boundary target loss.
 
-    L_dir:
-      signed boundary direction hinge.
-    L_rescue:
-      positive semantic retention on promoted O2M rescue masks.
-    L_hall:
-      safe-background suppression only when Teacher final pseudo is empty AND
-      Student high-confidence foreground occupies an abnormally large area.
+    Positive signed delta raises the target probability (expand).
+    Negative signed delta lowers it (shrink).
     """
-    logits = extract_student_semantic_logits(student_outputs)
-    if len(routes) != logits.shape[0]:
-        raise RuntimeError(
-            f"DURR routes={len(routes)} != Student batch={logits.shape[0]}"
-        )
+    logits = extract_student_semseg_logits(student_outputs)
+    total = logits.new_zeros(())
+    denom = logits.new_zeros(())
+    pixels = 0
+    expand = 0
+    shrink = 0
 
-    device = logits.device
-    hw = tuple(logits.shape[-2:])
-    zero = logits.sum() * 0.0
-
-    dir_num = zero
-    dir_den = zero
-    rescue_num = zero
-    rescue_den = zero
-    hall_num = zero
-    hall_den = zero
-
-    direction_pixels = 0
-    rescue_pixels = 0
-    hall_pixels = 0
-    hall_trigger_images = 0
-    student_fg_area_sum = 0.0
-
-    for i, route in enumerate(routes):
-        logit = logits[i]
-        prob = logit.sigmoid()
-
-        # --------------------------------------------------------
-        # Signed Boundary Routing
-        # --------------------------------------------------------
-        signed = _resize_route_map(
-            route["signed_direction"].to(device),
-            hw,
-        )
-        weight = _resize_route_map(
-            route["direction_weight"].to(device),
-            hw,
-        )
-        band = _resize_route_map(
-            route["direction_band"].to(device),
-            hw,
-            binary=True,
-        ) > 0.5
-        ref = _resize_route_map(
-            route["anchor_reference"].to(device),
-            hw,
+    for bi, route in enumerate(routes):
+        size = tuple(logits.shape[-2:])
+        weight = _resize_map(
+            route["directional_weight"].to(logits.device),
+            size,
+            mode="bilinear",
+        ).clamp_min(0.0)
+        target = _resize_map(
+            route["directional_target"].to(logits.device),
+            size,
+            mode="bilinear",
         ).clamp(0.0, 1.0)
+        signed = _resize_map(
+            route["signed_delta"].to(logits.device),
+            size,
+            mode="bilinear",
+        )
 
-        active = band & (weight > 0)
-        if active.any():
-            sign = torch.sign(signed[active]).detach()
-            progress = sign * (prob[active] - ref[active])
-            w = weight[active].detach().clamp_min(EPS)
-            l = F.relu(direction_margin - progress)
-            dir_num = dir_num + (w * l).sum()
-            dir_den = dir_den + w.sum()
-            direction_pixels += int(active.sum().item())
+        active = weight > 0
+        if not active.any():
+            continue
 
-        # --------------------------------------------------------
-        # Reliable O2M Rescue Retention
-        # --------------------------------------------------------
-        rescue_mask = _resize_route_map(
-            route["rescue_mask"].to(device),
-            hw,
-            binary=True,
-        ) > 0.5
-        if rescue_mask.any():
-            rescue_target = _resize_route_map(
-                route["rescue_prob"].to(device),
-                hw,
-            ).clamp(0.5, 1.0)
-            l = F.binary_cross_entropy_with_logits(
-                logit[rescue_mask],
-                rescue_target[rescue_mask].detach(),
-                reduction="sum",
-            )
-            rescue_num = rescue_num + l
-            rescue_den = rescue_den + rescue_mask.sum().float()
-            rescue_pixels += int(rescue_mask.sum().item())
+        loss_map = F.binary_cross_entropy_with_logits(
+            logits[bi, 0],
+            target,
+            reduction="none",
+        )
+        total = total + (loss_map * weight).sum()
+        denom = denom + weight.sum()
 
-        # --------------------------------------------------------
-        # Safe Hallucination Suppression
-        # --------------------------------------------------------
-        if bool(route["teacher_empty"]):
-            high_fg = prob.detach() >= hall_student_prob
-            area = float(high_fg.float().mean().item())
-            student_fg_area_sum += area
+        pixels += int(active.sum().item())
+        expand += int((active & (signed > 0)).sum().item())
+        shrink += int((active & (signed < 0)).sum().item())
 
-            if area > hall_area_threshold:
-                safe = _resize_route_map(
-                    route["safe_background"].to(device),
-                    hw,
-                    binary=True,
-                ) > 0.5
-                active_h = safe & high_fg
-                if active_h.any():
-                    hall_trigger_images += 1
-                    target0 = torch.zeros_like(logit[active_h])
-                    l = F.binary_cross_entropy_with_logits(
-                        logit[active_h],
-                        target0,
-                        reduction="sum",
-                    )
-                    hall_num = hall_num + l
-                    hall_den = hall_den + active_h.sum().float()
-                    hall_pixels += int(active_h.sum().item())
-
-    l_dir = dir_num / dir_den.clamp_min(1.0)
-    l_rescue = rescue_num / rescue_den.clamp_min(1.0)
-    l_hall = hall_num / hall_den.clamp_min(1.0)
-
-    scale = float(max(0.0, min(1.0, warmup_scale)))
-    total = scale * (
-        float(lambda_direction) * l_dir
-        + float(lambda_rescue) * l_rescue
-        + float(lambda_hallucination) * l_hall
-    )
-
-    stats = {
-        "durr_loss": float(total.detach().item()),
-        "durr_dir_loss": float(l_dir.detach().item()),
-        "durr_rescue_loss": float(l_rescue.detach().item()),
-        "durr_hall_loss": float(l_hall.detach().item()),
-        "durr_direction_pixels_student": float(direction_pixels),
-        "durr_rescue_pixels_student": float(rescue_pixels),
-        "durr_hall_pixels_student": float(hall_pixels),
-        "durr_hall_trigger_images": float(hall_trigger_images),
-        "durr_teacher_empty_student_area_sum": float(student_fg_area_sum),
-        "durr_warmup_scale": scale,
+    loss = total / denom.clamp_min(EPS)
+    return loss, {
+        "dir_pixels": float(pixels),
+        "dir_expand_pixels": float(expand),
+        "dir_shrink_pixels": float(shrink),
+        "dir_weight_sum": float(denom.detach().item()),
     }
-    return total, stats
+
+
+def compute_rescue_loss(
+    student_outputs: dict[str, Any],
+    routes: list[dict[str, Any]],
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Extra positive persistence pressure for high-trust O2M rescue regions."""
+    logits = extract_student_semseg_logits(student_outputs)
+    total = logits.new_zeros(())
+    denom = logits.new_zeros(())
+    pixels = 0
+    images = 0
+
+    for bi, route in enumerate(routes):
+        size = tuple(logits.shape[-2:])
+        mask = _resize_map(
+            route["rescue_mask"].to(logits.device),
+            size,
+            mode="nearest",
+        ) > 0.5
+        weight = _resize_map(
+            route["rescue_weight"].to(logits.device),
+            size,
+            mode="nearest",
+        ).clamp_min(0.0)
+
+        if not mask.any():
+            continue
+
+        target = torch.ones_like(logits[bi, 0])
+        loss_map = F.binary_cross_entropy_with_logits(
+            logits[bi, 0],
+            target,
+            reduction="none",
+        )
+        w = weight * mask.float()
+        total = total + (loss_map * w).sum()
+        denom = denom + w.sum()
+        pixels += int(mask.sum().item())
+        images += 1
+
+    loss = total / denom.clamp_min(EPS)
+    return loss, {
+        "rescue_pixels": float(pixels),
+        "rescue_images": float(images),
+        "rescue_weight_sum": float(denom.detach().item()),
+    }
+
+
+def compute_safe_hallucination_loss(
+    student_outputs: dict[str, Any],
+    routes: list[dict[str, Any]],
+    *,
+    student_threshold: float = 0.80,
+    area_threshold: float = 0.10,
+    area_weight: float = 0.25,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """
+    Suppress unsupported large foreground ONLY for Teacher-empty images.
+
+    Important: Teacher empty is NOT treated as all-background GT.
+    Pixel BCE is applied only where both heads have low evidence (safe_bg_mask)
+    and the Student itself is highly foreground-confident. A soft excess-area
+    term prevents giant hallucinations without forcing the whole image to zero.
+    """
+    logits = extract_student_semseg_logits(student_outputs)
+    prob = logits.sigmoid()
+
+    total_pixel = logits.new_zeros(())
+    denom = logits.new_zeros(())
+    total_area = logits.new_zeros(())
+    triggered = 0
+    pixels = 0
+
+    for bi, route in enumerate(routes):
+        if not bool(route["teacher_empty"]):
+            continue
+
+        p = prob[bi, 0]
+        area_ratio_detached = float(
+            (p.detach() >= student_threshold).float().mean().item()
+        )
+        if area_ratio_detached <= area_threshold:
+            continue
+
+        triggered += 1
+        size = tuple(p.shape[-2:])
+        safe_bg = _resize_map(
+            route["safe_bg_mask"].to(logits.device),
+            size,
+            mode="nearest",
+        ) > 0.5
+
+        unsupported = (
+            safe_bg
+            & (p.detach() >= student_threshold)
+        )
+        if unsupported.any():
+            target0 = torch.zeros_like(p)
+            loss_map = F.binary_cross_entropy_with_logits(
+                logits[bi, 0],
+                target0,
+                reduction="none",
+            )
+            total_pixel = total_pixel + loss_map[unsupported].sum()
+            denom = denom + unsupported.float().sum()
+            pixels += int(unsupported.sum().item())
+
+        # Differentiable excess soft foreground mass. This is deliberately
+        # weaker than whole-image BCE-to-zero.
+        soft_area = p.mean()
+        total_area = total_area + torch.relu(
+            soft_area - area_threshold
+        ).pow(2)
+
+    pixel_loss = total_pixel / denom.clamp_min(EPS)
+    area_loss = (
+        total_area / max(triggered, 1)
+        if triggered > 0
+        else logits.new_zeros(())
+    )
+    loss = pixel_loss + area_weight * area_loss
+
+    return loss, {
+        "hall_triggered_images": float(triggered),
+        "hall_pixels": float(pixels),
+        "hall_pixel_loss": float(pixel_loss.detach().item()),
+        "hall_area_loss": float(area_loss.detach().item()),
+    }
+
+
+def durr_ramp(
+    global_step: int,
+    steps_per_epoch: int,
+    warmup_epochs: float,
+) -> float:
+    warmup_steps = max(
+        1,
+        int(warmup_epochs * steps_per_epoch),
+    )
+    return min(
+        1.0,
+        float(global_step) / float(warmup_steps),
+    )

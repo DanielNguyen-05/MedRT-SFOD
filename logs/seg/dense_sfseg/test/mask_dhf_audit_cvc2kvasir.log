@@ -1,0 +1,44 @@
+========================================================================
+MASK-DHF FULL TARGET AUDIT
+========================================================================
+images        : 1000
+labels loaded : NO
+GT masks used : NO
+tau_o2o       : 0.5
+tau_o2m       : 0.5
+tau_no        : 0.2
+tau_dup       : 0.7
+mask_thr      : 0.5
+mask_rel_thr  : 0.65
+mask_no       : 0.2
+[Batch 001/125] anchors=6 candidates=52 reliable=52 extra=2 fused=8
+[Batch 020/125] anchors=151 candidates=1335 reliable=1335 extra=12 fused=163
+[Batch 040/125] anchors=302 candidates=2655 reliable=2655 extra=23 fused=325
+[Batch 060/125] anchors=469 candidates=4050 reliable=4050 extra=32 fused=501
+[Batch 080/125] anchors=624 candidates=5467 reliable=5467 extra=41 fused=665
+[Batch 100/125] anchors=775 candidates=6815 reliable=6815 extra=52 fused=827
+[Batch 120/125] anchors=940 candidates=8184 reliable=8184 extra=60 fused=1000
+[Batch 125/125] anchors=978 candidates=8528 reliable=8528 extra=62 fused=1040
+
+========================================================================
+MASK-DHF AUDIT RESULTS
+========================================================================
+anchors                     : 978
+candidates                  : 8528
+candidate_valid_mask        : 8528
+candidate_reliable          : 8528
+rejected_reliability        : 0
+rejected_box_overlap        : 8261
+rejected_mask_overlap       : 8
+extras                      : 62
+fused_after_mask_filter     : 1040
+images_with_pseudo          : 951
+images_without_pseudo       : 49
+
+mask confidence   : {'n': 8528, 'mean': 0.9675978900441868, 'median': 0.9704423546791077, 'p05': 0.9434590131044388, 'p10': 0.951114547252655, 'p25': 0.9624608308076859, 'p75': 0.9764236509799957, 'p90': 0.9802026808261871, 'p95': 0.9820669978857041, 'min': 0.8624603152275085, 'max': 0.9881917834281921}
+mask reliability  : {'n': 8528, 'mean': 0.88812602407126, 'median': 0.910658597946167, 'p05': 0.7476087868213653, 'p10': 0.7887528121471405, 'p25': 0.8606821596622467, 'p75': 0.9344347715377808, 'p90': 0.9452731072902679, 'p95': 0.9496550500392914, 'min': 0.6713758707046509, 'max': 0.9667727947235107}
+
+avg fused/image   : 1.04
+
+[PASS] Mask-DHF audit complete
+saved: /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/mask_dhf_audit.json
