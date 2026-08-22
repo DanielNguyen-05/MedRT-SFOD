@@ -1,33 +1,56 @@
-#!/usr/bin/env python3
+"""
+MedRT-SFSeg Stage-2 with DURR + SegMARD-v2.
+
+Main experiment:
+  Mask-DHF-style hard pseudo geometry
+  + DURR (Dual-head Uncertainty Reliability Routing)
+  + SegMARD-v2
+  + epoch-level Mean-Teacher EMA
+
+DURR-v1:
+  - signed cross-head boundary routing (expand / shrink)
+  - reliable O2M rescue persistence
+  - safe hallucination suppression on Teacher-empty images
+
+The module is TRAINING-ONLY. Deployment remains the adapted YOLO26-S-Seg
+O2O inference graph.
+
+This script NEVER reads target GT during adaptation.
+It automatically saves BOTH final Student and final EMA Teacher checkpoints.
+"""
 
 from __future__ import annotations
 
 import argparse
+import copy
+import csv
 import json
 import math
-import random
-import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
+# Local repo must precede site-packages.
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(SCRIPT_DIR))
+
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from scipy.ndimage import distance_transform_edt
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+from ultralytics import YOLO
 
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = Path(__file__).resolve().parents[3]
-
-sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(SCRIPT_DIR))
-
-
-from smoke_stage2_mt_seg import (  # noqa: E402
+from smoke_stage2_mt_seg import (
     TargetMTDataset,
     build_pseudo_batch,
     collate,
@@ -37,101 +60,48 @@ from smoke_stage2_mt_seg import (  # noqa: E402
     setup_teacher_student,
     update_teacher_ema,
 )
-
-from mask_dhf_seg import (  # noqa: E402
-    generate_mask_dhf_pseudo_masks,
-)
-
-from cc_dhf_seg import (  # noqa: E402
-    generate_cc_dhf_pseudo_masks,
-)
-
-from boundary_dhf_seg import (  # noqa: E402
-    generate_boundary_dhf_pseudo_masks,
-)
-
-from durr_seg import (  # noqa: E402
-    compute_durr_loss,
+from segmard_seg import add_segmard_args, compute_segmard_loss
+from durr_seg import (
+    compute_directional_routing_loss,
+    compute_rescue_loss,
+    compute_safe_hallucination_loss,
+    durr_ramp,
     generate_durr_pseudo_masks,
 )
 
-from segmard_seg import (
-    add_segmard_args,
-    compute_segmard_loss,
-)
-
-# ================================================================
-# MARD
-# ================================================================
 
 class SegmentInputFeatureHook:
-    """
-    Capture P3/P4/P5 features entering Segment26.
-    """
+    """Capture P3/P4/P5 features entering Segment26."""
 
-    def __init__(
-        self,
-        model: nn.Module,
-    ):
+    def __init__(self, model: nn.Module):
         self.latest = None
-
         self.head = model.model[-1]
-
         if not (
             hasattr(self.head, "one2one")
-            and hasattr(
-                self.head,
-                "one2many",
-            )
+            and hasattr(self.head, "one2many")
         ):
-            raise RuntimeError(
-                "Final head is not dual-head"
-            )
-
-        self.handle = (
-            self.head
-            .register_forward_pre_hook(
-                self._hook
-            )
-        )
+            raise RuntimeError("Final head is not dual-head")
+        self.handle = self.head.register_forward_pre_hook(self._hook)
 
     @staticmethod
     def _valid_feature_list(x):
         return (
-            isinstance(
-                x,
-                (list, tuple),
-            )
+            isinstance(x, (list, tuple))
             and len(x) >= 3
             and all(
-                isinstance(t, torch.Tensor)
-                and t.ndim == 4
+                isinstance(t, torch.Tensor) and t.ndim == 4
                 for t in x[:3]
             )
         )
 
-    def _hook(
-        self,
-        _module,
-        inputs,
-    ):
+    def _hook(self, _module, inputs):
         if (
             len(inputs) == 1
-            and self._valid_feature_list(
-                inputs[0]
-            )
+            and self._valid_feature_list(inputs[0])
         ):
-            self.latest = list(
-                inputs[0][:3]
-            )
-
-        elif self._valid_feature_list(
-            inputs
-        ):
-            self.latest = list(
-                inputs[:3]
-            )
-
+            self.latest = list(inputs[0][:3])
+        elif self._valid_feature_list(inputs):
+            self.latest = list(inputs[:3])
         else:
             self.latest = None
 
@@ -141,1163 +111,1012 @@ class SegmentInputFeatureHook:
             self.handle = None
 
 
-def variance_loss(
-    tokens: torch.Tensor,
-    gamma: float,
-    eps: float = 1e-4,
-):
-    if (
-        tokens.numel() == 0
-        or tokens.shape[0] < 2
-    ):
-        return tokens.new_zeros(())
-
-    std = torch.sqrt(
-        tokens.var(
-            dim=0,
-            unbiased=False,
-        )
-        + eps
-    )
-
-    return torch.relu(
-        gamma - std
-    ).mean()
-
-
-def covariance_loss(
-    tokens: torch.Tensor,
-    eps: float = 1e-4,
-):
-    if (
-        tokens.numel() == 0
-        or tokens.shape[0] < 2
-    ):
-        return tokens.new_zeros(())
-
-    n, c = tokens.shape
-
-    z = (
-        tokens
-        - tokens.mean(
-            dim=0,
-            keepdim=True,
-        )
-    )
-
-    z = z / (
-        z.std(
-            dim=0,
-            keepdim=True,
-        )
-        + eps
-    )
-
-    cov = (
-        z.T @ z
-    ) / max(
-        n - 1,
-        1,
-    )
-
-    off_diag = (
-        cov
-        - torch.diag(
-            torch.diagonal(cov)
-        )
-    )
-
-    return (
-        off_diag.pow(2).sum()
-        / (
-            c * (c - 1)
-            + 1e-6
-        )
-    )
-
-
-def assign_boxes_to_levels(
-    boxes: torch.Tensor,
-    stride3: float,
-    stride4: float,
-    eta: float,
-):
-    if boxes.numel() == 0:
-        return boxes.new_zeros(
-            (0,),
-            dtype=torch.long,
-        )
-
-    sizes = torch.sqrt(
-        (
-            boxes[:, 2]
-            - boxes[:, 0]
-        ).clamp(min=1.0)
-        *
-        (
-            boxes[:, 3]
-            - boxes[:, 1]
-        ).clamp(min=1.0)
-    )
-
-    levels = torch.empty_like(
-        sizes,
-        dtype=torch.long,
-    )
-
-    levels[
-        sizes
-        <= eta * stride3
-    ] = 0
-
-    levels[
-        (
-            sizes
-            > eta * stride3
-        )
-        &
-        (
-            sizes
-            <= eta * stride4
-        )
-    ] = 1
-
-    levels[
-        sizes
-        > eta * stride4
-    ] = 2
-
-    return levels
-
-
-def feature_rect(
-    box,
-    h_f,
-    w_f,
-    h_pad,
-    w_pad,
-):
-    x1, y1, x2, y2 = (
-        box.float()
-    )
-
-    x1f = int(
-        torch.floor(
-            x1 * w_f
-            / max(w_pad, 1)
-        ).item()
-    )
-
-    y1f = int(
-        torch.floor(
-            y1 * h_f
-            / max(h_pad, 1)
-        ).item()
-    )
-
-    x2f = int(
-        torch.ceil(
-            x2 * w_f
-            / max(w_pad, 1)
-        ).item()
-    ) - 1
-
-    y2f = int(
-        torch.ceil(
-            y2 * h_f
-            / max(h_pad, 1)
-        ).item()
-    ) - 1
-
-    x1f = max(
-        0,
-        min(x1f, w_f - 1),
-    )
-
-    x2f = max(
-        0,
-        min(x2f, w_f - 1),
-    )
-
-    y1f = max(
-        0,
-        min(y1f, h_f - 1),
-    )
-
-    y2f = max(
-        0,
-        min(y2f, h_f - 1),
-    )
-
-    if (
-        x2f < x1f
-        or y2f < y1f
-    ):
-        return None
-
-    return (
-        x1f,
-        y1f,
-        x2f,
-        y2f,
-    )
-
-
-def sample_level_tokens(
-    fmap: torch.Tensor,
-    boxes: torch.Tensor,
-    levels: torch.Tensor,
-    target_level: int,
-    h_pad: int,
-    w_pad: int,
-    fg_points: int,
-    bg_points: int,
-):
-    device = fmap.device
-
-    _, h_f, w_f = fmap.shape
-
-    fg_tokens = []
-
-    fg_mask = torch.zeros(
-        (h_f, w_f),
-        dtype=torch.bool,
-        device=device,
-    )
-
-    level_mask = (
-        levels == target_level
-    )
-
-    for box in boxes[level_mask]:
-        rect = feature_rect(
-            box,
-            h_f,
-            w_f,
-            h_pad,
-            w_pad,
-        )
-
-        if rect is None:
-            continue
-
-        x1, y1, x2, y2 = rect
-
-        xs = torch.randint(
-            x1,
-            x2 + 1,
-            (fg_points,),
-            device=device,
-        )
-
-        ys = torch.randint(
-            y1,
-            y2 + 1,
-            (fg_points,),
-            device=device,
-        )
-
-        fg_tokens.append(
-            fmap[:, ys, xs].T
-        )
-
-        fg_mask[
-            y1:y2 + 1,
-            x1:x2 + 1,
-        ] = True
-
-    bg_coords = (
-        ~fg_mask
-    ).nonzero(
-        as_tuple=False
-    )
-
-    if bg_coords.numel():
-        n = min(
-            bg_points,
-            bg_coords.shape[0],
-        )
-
-        idx = torch.randint(
-            0,
-            bg_coords.shape[0],
-            (n,),
-            device=device,
-        )
-
-        sel = bg_coords[idx]
-
-        bg_tokens = fmap[
-            :,
-            sel[:, 0],
-            sel[:, 1],
-        ].T
-
-    else:
-        ys = torch.randint(
-            0,
-            h_f,
-            (bg_points,),
-            device=device,
-        )
-
-        xs = torch.randint(
-            0,
-            w_f,
-            (bg_points,),
-            device=device,
-        )
-
-        bg_tokens = fmap[
-            :,
-            ys,
-            xs,
-        ].T
-
-    tokens = (
-        fg_tokens
-        + [bg_tokens]
-    )
-
-    return torch.cat(
-        tokens,
-        dim=0,
-    )
-
-
-def compute_mard_loss(
-    feats,
-    pseudo_labels,
-    h_pad,
-    w_pad,
-    args,
-):
-    total = feats[0].new_zeros(
-        ()
-    )
-
-    stride3 = (
-        float(w_pad)
-        / float(
-            feats[0].shape[3]
-        )
-    )
-
-    stride4 = (
-        float(w_pad)
-        / float(
-            feats[1].shape[3]
-        )
-    )
-
-    stats = {}
-
-    for level_idx, fmap in enumerate(
-        feats[:3]
-    ):
-        tokens_all = []
-
-        for b in range(
-            fmap.shape[0]
-        ):
-            labels = pseudo_labels[b]
-
-            if labels.numel() == 0:
-                continue
-
-            boxes = labels[:, :4]
-
-            conf = labels[:, 4]
-
-            keep = (
-                conf
-                >= args.mard_box_conf
-            )
-
-            boxes = boxes[keep]
-            conf = conf[keep]
-
-            if boxes.numel() == 0:
-                continue
-
-            if (
-                boxes.shape[0]
-                > args.mard_topk_boxes
-            ):
-                order = torch.argsort(
-                    conf,
-                    descending=True,
-                )[
-                    :args.mard_topk_boxes
-                ]
-
-                boxes = boxes[order]
-
-            levels = (
-                assign_boxes_to_levels(
-                    boxes,
-                    stride3,
-                    stride4,
-                    args.mard_eta,
-                )
-            )
-
-            tokens = (
-                sample_level_tokens(
-                    fmap[b],
-                    boxes,
-                    levels,
-                    level_idx,
-                    h_pad,
-                    w_pad,
-                    args.mard_fg_points,
-                    args.mard_bg_points,
-                )
-            )
-
-            if tokens is not None:
-                tokens_all.append(
-                    tokens
-                )
-
-        if tokens_all:
-            z = torch.cat(
-                tokens_all,
-                dim=0,
-            )
-
-            var = variance_loss(
-                z,
-                args.mard_gamma,
-            )
-
-            cov = covariance_loss(z)
-
-        else:
-            var = fmap.new_zeros(())
-            cov = fmap.new_zeros(())
-
-        level_loss = (
-            args.mard_alpha
-            * var
-            +
-            args.mard_beta
-            * cov
-        )
-
-        total = (
-            total
-            + level_loss
-        )
-
-        stats[
-            f"p{level_idx + 3}_var"
-        ] = float(
-            var.detach()
-        )
-
-        stats[
-            f"p{level_idx + 3}_cov"
-        ] = float(
-            cov.detach()
-        )
-
-    return total, stats
-
-
-def mard_weight(
-    args,
-    global_step,
-    steps_per_epoch,
-    avg_conf,
-):
-    warmup_steps = max(
-        1,
-        int(
-            args.mard_warmup_epochs
-            * steps_per_epoch
-        ),
-    )
-
-    ramp = min(
-        1.0,
-        float(global_step)
-        / float(warmup_steps),
-    )
-
-    gate = (
-        avg_conf
-        - args.mard_gate_threshold
-    ) / max(
-        1.0
-        - args.mard_gate_threshold,
-        1e-6,
-    )
-
-    gate = float(
-        np.clip(
-            gate,
-            0.0,
-            1.0,
-        )
-    )
-
-    weight = (
-        args.mard_lambda0
-        * ramp
-        * gate
-    )
-
-    return min(
-        weight,
-        args.mard_lambda_max,
-    )
-
-
-def average_confidence(
-    labels,
-):
-    values = [
+def average_confidence(labels) -> float:
+    vals = [
         x[:, 4]
         for x in labels
         if x.numel()
     ]
-
-    if not values:
+    if not vals:
         return 0.0
+    return float(torch.cat(vals).mean().item())
 
-    return float(
-        torch.cat(values)
-        .mean()
-        .item()
+
+def mard_weight(
+    args,
+    global_step: int,
+    steps_per_epoch: int,
+    avg_conf: float,
+) -> float:
+    warmup_steps = max(
+        1,
+        int(args.mard_warmup_epochs * steps_per_epoch),
+    )
+    ramp = min(
+        1.0,
+        float(global_step) / float(warmup_steps),
+    )
+    gate = (
+        avg_conf - args.mard_gate_threshold
+    ) / max(1.0 - args.mard_gate_threshold, 1e-6)
+    gate = float(np.clip(gate, 0.0, 1.0))
+    return min(
+        args.mard_lambda0 * ramp * gate,
+        args.mard_lambda_max,
     )
 
 
+def save_model(wrapper, model, path: Path) -> None:
+    wrapper.model = model
+    wrapper.save(str(path))
 
-def slice_batch_structure(
-    obj,
-    indices: torch.Tensor,
-    full_batch_size: int,
-):
+
+
+def _analysis_letterbox(
+    image_bgr: np.ndarray,
+    imgsz: int,
+) -> tuple[torch.Tensor, dict]:
+    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    h, w = rgb.shape[:2]
+    scale = float(imgsz) / float(max(h, w))
+    nh = int(round(h * scale))
+    nw = int(round(w * scale))
+    resized = cv2.resize(rgb, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    canvas = np.full((imgsz, imgsz, 3), 114, dtype=np.uint8)
+    top = (imgsz - nh) // 2
+    left = (imgsz - nw) // 2
+    canvas[top:top + nh, left:left + nw] = resized
+    tensor = (
+        torch.from_numpy(np.ascontiguousarray(canvas))
+        .permute(2, 0, 1)
+        .float()
+        / 255.0
+    )
+    return tensor, {
+        "orig_h": h,
+        "orig_w": w,
+        "nh": nh,
+        "nw": nw,
+        "top": top,
+        "left": left,
+        "imgsz": imgsz,
+    }
+
+
+def _analysis_restore(
+    x: torch.Tensor,
+    meta: dict,
+    *,
+    binary: bool,
+    clip_range: tuple[float, float] | None = (0.0, 1.0),
+) -> np.ndarray:
+    """Restore proto/letterbox-space maps to original image resolution.
+
+    `clip_range=None` is required for signed DURR delta maps because negative
+    values carry the shrink direction and must never be clipped away.
     """
-    Recursively slice Student training outputs along batch dimension.
-
-    DURR needs one Student forward over the WHOLE target minibatch so
-    teacher-empty images can still receive safe-negative supervision. Native
-    SFSeg/SegMARD losses are then computed only on pseudo-valid images.
-    """
-    if isinstance(obj, torch.Tensor):
-        if obj.ndim > 0 and int(obj.shape[0]) == int(full_batch_size):
-            return obj.index_select(0, indices)
-        return obj
-
-    if isinstance(obj, dict):
-        return {
-            k: slice_batch_structure(v, indices, full_batch_size)
-            for k, v in obj.items()
-        }
-
-    if isinstance(obj, list):
-        return [
-            slice_batch_structure(v, indices, full_batch_size)
-            for v in obj
-        ]
-
-    if isinstance(obj, tuple):
-        return tuple(
-            slice_batch_structure(v, indices, full_batch_size)
-            for v in obj
-        )
-
-    return obj
-
-
-def durr_warmup_scale(
-    epoch_index: int,
-    batch_index: int,
-    steps_per_epoch: int,
-    warmup_epochs: float,
-) -> float:
-    if warmup_epochs <= 0:
-        return 1.0
-    step = epoch_index * max(steps_per_epoch, 1) + batch_index
-    total = max(1.0, warmup_epochs * max(steps_per_epoch, 1))
-    return float(min(1.0, max(0.0, step / total)))
-
-
-# ================================================================
-# Main
-# ================================================================
-
-
-def inject_soft_instance_masks(
-    pseudo_batch: dict,
-    soft_masks: list[torch.Tensor],
-) -> dict:
-    """
-    Replace only native instance-mask BCE targets with BDL soft masks.
-
-    build_pseudo_batch() is still called with HARD geometry masks first, so
-    boxes/classes/semantic pseudo targets remain exactly on the baseline path.
-    """
-    if "masks" not in pseudo_batch:
-        raise RuntimeError("Pseudo batch has no instance masks")
-
-    target_masks = pseudo_batch["masks"]
-    if target_masks.ndim != 3:
-        raise RuntimeError(
-            f"Expected pseudo_batch['masks'] [N,H,W], got {tuple(target_masks.shape)}"
-        )
-
-    target_hw = tuple(target_masks.shape[-2:])
-    pieces = []
-    expected_n = 0
-    cursor = 0
-
-    for masks_i in soft_masks:
-        if masks_i.ndim != 3:
-            raise RuntimeError(
-                f"Expected BDL soft masks [N,H,W], got {tuple(masks_i.shape)}"
+    x = x.detach().float().cpu()
+    y = x[None, None]
+    imgsz = int(meta["imgsz"])
+    if tuple(y.shape[-2:]) != (imgsz, imgsz):
+        if binary:
+            y = F.interpolate(y, size=(imgsz, imgsz), mode="nearest")
+        else:
+            y = F.interpolate(
+                y,
+                size=(imgsz, imgsz),
+                mode="bilinear",
+                align_corners=False,
             )
-        n_i = int(masks_i.shape[0])
-        expected_n += n_i
-        if n_i == 0:
-            continue
-        resized = F.interpolate(
-            masks_i[:, None].float(),
-            size=target_hw,
-            mode="bilinear",
-            align_corners=False,
-        )[:, 0].clamp(0.0, 1.0)
 
-        # Do not let bilinear interpolation create support outside the exact
-        # HARD baseline masks produced by build_pseudo_batch(). This guarantees
-        # that BDL changes only boundary target confidence, not pseudo geometry.
-        hard_support = (
-            target_masks[cursor:cursor + n_i] > 0.5
-        ).to(device=resized.device, dtype=resized.dtype)
-        resized = resized * hard_support
-        pieces.append(resized)
-        cursor += n_i
+    top = int(meta["top"])
+    left = int(meta["left"])
+    nh = int(meta["nh"])
+    nw = int(meta["nw"])
+    crop = y[0, 0, top:top + nh, left:left + nw].numpy()
 
-    if expected_n != int(target_masks.shape[0]):
-        raise RuntimeError(
-            f"BDL soft-mask count={expected_n} != pseudo batch masks={target_masks.shape[0]}"
-        )
-
-    if pieces:
-        soft = torch.cat(pieces, dim=0).to(
-            device=target_masks.device,
-            dtype=target_masks.dtype,
-        )
-    else:
-        soft = target_masks.new_zeros(target_masks.shape)
-
-    if soft.shape != target_masks.shape:
-        raise RuntimeError(
-            f"BDL resized masks {tuple(soft.shape)} != baseline masks {tuple(target_masks.shape)}"
-        )
-
-    out = dict(pseudo_batch)
-    out["masks"] = soft
+    interp = cv2.INTER_NEAREST if binary else cv2.INTER_LINEAR
+    out = cv2.resize(
+        crop,
+        (int(meta["orig_w"]), int(meta["orig_h"])),
+        interpolation=interp,
+    )
+    if binary:
+        return (out > 0.5).astype(np.uint8)
+    out = out.astype(np.float32)
+    if clip_range is not None:
+        out = np.clip(out, clip_range[0], clip_range[1])
     return out
 
 
-def append_jsonl(path: Path, row: dict) -> None:
+def _analysis_student_union(
+    result,
+    h: int,
+    w: int,
+) -> np.ndarray:
+    if (
+        result.masks is None
+        or result.masks.data is None
+        or result.masks.data.numel() == 0
+    ):
+        return np.zeros((h, w), dtype=np.uint8)
+    m = result.masks.data.detach().float()
+    if m.ndim == 2:
+        m = m.unsqueeze(0)
+    union = m.amax(dim=0, keepdim=True).unsqueeze(0)
+    if tuple(union.shape[-2:]) != (h, w):
+        union = F.interpolate(
+            union,
+            size=(h, w),
+            mode="nearest",
+        )
+    return (
+        (union[0, 0] > 0.5)
+        .cpu()
+        .numpy()
+        .astype(np.uint8)
+    )
+
+
+def _safe_div(a: float, b: float) -> float:
+    return float(a / b) if b > 0 else 0.0
+
+
+def _analysis_binary_surface(mask: np.ndarray) -> np.ndarray:
+    """One-pixel inner surface (3x3 erosion), matching our legacy evaluator."""
+    x = (mask > 0).astype(np.uint8)
+    if not x.any():
+        return np.zeros_like(x, dtype=bool)
+    eroded = cv2.erode(x, np.ones((3, 3), np.uint8), iterations=1)
+    return np.logical_and(x.astype(bool), ~eroded.astype(bool))
+
+
+def _analysis_surface_metrics(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    *,
+    spacing_mm: tuple[float, float],
+) -> dict[str, float | str | int]:
+    """Compute Taha/Hanbury-style symmetric surface distances.
+
+    HEAL (BMVC 2025) reports ASD in mm and cites Taha & Hanbury (2015).
+    We therefore use the symmetric pooled surface-distance definition:
+
+      ASD = [sum_{p in S(P)} d(p,S(G)) + sum_{g in S(G)} d(g,S(P))]
+            / [|S(P)| + |S(G)|].
+
+    Distances in `asd_heal_mm` / `hd95_mm` use `spacing_mm` through SciPy's
+    Euclidean distance transform. CVC-ClinicDB and Kvasir-SEG image files do
+    not provide calibrated physical pixel spacing; the default CLI spacing is
+    (1.0, 1.0), which is a unit-spacing HEAL-compatible convention and is
+    numerically equal to pixels. If true physical spacing is available, pass it
+    explicitly with --analysis-spacing-mm-y/x.
+
+    Empty-mask behavior is our explicit finite analysis convention (HEAL does
+    not specify it in the paper): if exactly one mask is empty, use the physical
+    image diagonal and record the status.
+    """
+    p = pred.astype(bool)
+    g = gt.astype(bool)
+    sy, sx = float(spacing_mm[0]), float(spacing_mm[1])
+    h, w = p.shape
+    diag_px = float(math.hypot(h, w))
+    diag_mm = float(math.hypot(h * sy, w * sx))
+
+    if not p.any() and not g.any():
+        return {
+            "asd_px": 0.0,
+            "hd95_px": 0.0,
+            "asd_heal_mm": 0.0,
+            "hd95_mm": 0.0,
+            "boundary_status": "both_empty",
+            "pred_surface_pixels": 0,
+            "gt_surface_pixels": 0,
+        }
+    if not p.any() or not g.any():
+        return {
+            "asd_px": diag_px,
+            "hd95_px": diag_px,
+            "asd_heal_mm": diag_mm,
+            "hd95_mm": diag_mm,
+            "boundary_status": "pred_empty" if not p.any() else "gt_empty",
+            "pred_surface_pixels": int(_analysis_binary_surface(p).sum()),
+            "gt_surface_pixels": int(_analysis_binary_surface(g).sum()),
+        }
+
+    ps = _analysis_binary_surface(p)
+    gs = _analysis_binary_surface(g)
+    if not ps.any() or not gs.any():
+        return {
+            "asd_px": diag_px,
+            "hd95_px": diag_px,
+            "asd_heal_mm": diag_mm,
+            "hd95_mm": diag_mm,
+            "boundary_status": "surface_empty",
+            "pred_surface_pixels": int(ps.sum()),
+            "gt_surface_pixels": int(gs.sum()),
+        }
+
+    # Pixel-space legacy metric (spacing=1), retained for continuity with prior runs.
+    dt_gt_px = distance_transform_edt(~gs)
+    dt_pr_px = distance_transform_edt(~ps)
+    d_px = np.concatenate([dt_gt_px[ps], dt_pr_px[gs]]).astype(np.float64)
+
+    # HEAL/Taha-Hanbury-compatible physical/unit-space metric.
+    dt_gt_mm = distance_transform_edt(~gs, sampling=(sy, sx))
+    dt_pr_mm = distance_transform_edt(~ps, sampling=(sy, sx))
+    d_mm = np.concatenate([dt_gt_mm[ps], dt_pr_mm[gs]]).astype(np.float64)
+
+    return {
+        "asd_px": float(d_px.mean()),
+        "hd95_px": float(np.percentile(d_px, 95.0)),
+        "asd_heal_mm": float(d_mm.mean()),
+        "hd95_mm": float(np.percentile(d_mm, 95.0)),
+        "boundary_status": "ok",
+        "pred_surface_pixels": int(ps.sum()),
+        "gt_surface_pixels": int(gs.sum()),
+    }
+
+
+def _analysis_metrics(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    *,
+    spacing_mm: tuple[float, float],
+) -> dict[str, float | int | str]:
+    p = pred.astype(bool)
+    g = gt.astype(bool)
+    tp = int(np.logical_and(p, g).sum())
+    fp = int(np.logical_and(p, ~g).sum())
+    fn = int(np.logical_and(~p, g).sum())
+    tn = int(np.logical_and(~p, ~g).sum())
+    out: dict[str, float | int | str] = {
+        "dice": _safe_div(2.0 * tp, 2.0 * tp + fp + fn),
+        "iou": _safe_div(tp, tp + fp + fn),
+        "precision": _safe_div(tp, tp + fp),
+        "sensitivity": _safe_div(tp, tp + fn),
+        "specificity": _safe_div(tn, tn + fp),
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "tn": tn,
+        "pred_pixels": int(p.sum()),
+        "gt_pixels": int(g.sum()),
+        "pred_empty": int(not p.any()),
+    }
+    out.update(_analysis_surface_metrics(pred, gt, spacing_mm=spacing_mm))
+    return out
+
+
+def _save_mask_png(path: Path, arr: np.ndarray, *, binary: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row) + "\\n")
+    if binary:
+        y = (arr > 0.5).astype(np.uint8) * 255
+    else:
+        y = np.round(np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8)
+    cv2.imwrite(str(path), y)
 
 
-def save_bdl_debug_panels(
-    debug_items,
-    paths,
+def _save_signed_map(path_png: Path, path_npy: Path, arr: np.ndarray) -> None:
+    """Save raw signed delta as .npy and a zero-centered display PNG."""
+    path_png.parent.mkdir(parents=True, exist_ok=True)
+    path_npy.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path_npy, arr.astype(np.float32))
+    vis = np.round((np.clip(arr, -1.0, 1.0) + 1.0) * 127.5).astype(np.uint8)
+    cv2.imwrite(str(path_png), vis)
+
+
+def _mean_std(rows: list[dict], key: str) -> tuple[float, float]:
+    vals = np.asarray([float(r[key]) for r in rows if key in r], dtype=np.float64)
+    if vals.size == 0:
+        return 0.0, 0.0
+    return float(vals.mean()), float(vals.std(ddof=0))
+
+
+def _fmt_mean_std(mean: float, std: float, scale: float = 1.0, nd: int = 3) -> str:
+    return f"{mean * scale:.{nd}f} ± {std * scale:.{nd}f}"
+
+
+def _write_dict_csv(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    fields: list[str] = []
+    seen = set()
+    for row in rows:
+        for key in row:
+            if key not in seen:
+                seen.add(key)
+                fields.append(key)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _markdown_table(rows: list[dict], columns: list[tuple[str, str]]) -> str:
+    header = "| " + " | ".join(label for _, label in columns) + " |"
+    sep = "|" + "|".join("---" for _ in columns) + "|"
+    body = []
+    for row in rows:
+        body.append("| " + " | ".join(str(row.get(key, "")) for key, _ in columns) + " |")
+    return "\n".join([header, sep, *body]) + "\n"
+
+
+def _save_post_training_panel(
+    out_path: Path,
+    image_bgr: np.ndarray,
+    gt: np.ndarray | None,
+    initial_route: dict,
+    final_route: dict,
+    student_mask: np.ndarray,
+    title: str,
+) -> None:
+    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+
+    fig, axes = plt.subplots(2, 5, figsize=(20, 8))
+    gt_show = (
+        gt
+        if gt is not None
+        else np.zeros(student_mask.shape, dtype=np.uint8)
+    )
+    error = (
+        np.abs(student_mask.astype(np.float32) - gt.astype(np.float32))
+        if gt is not None
+        else np.zeros(student_mask.shape, dtype=np.float32)
+    )
+
+    items = [
+        (rgb, "Image", None),
+        (gt_show, "GT (post-training only)", (0, 1)),
+        (
+            initial_route["o2o"],
+            "Initial Teacher O2O",
+            (0, 1),
+        ),
+        (
+            initial_route["fused"],
+            "Initial Teacher fused",
+            (0, 1),
+        ),
+        (
+            final_route["fused"],
+            "Final EMA Teacher fused",
+            (0, 1),
+        ),
+        (
+            final_route["o2m_witness"],
+            "Final Teacher O2M witnesses",
+            (0, 1),
+        ),
+        (
+            final_route["signed_delta"],
+            "Final signed O2M-O2O delta",
+            (-1, 1),
+        ),
+        (
+            final_route["rescue"],
+            "Final O2M rescue",
+            (0, 1),
+        ),
+        (
+            student_mask,
+            "Final Student prediction",
+            (0, 1),
+        ),
+        (
+            error,
+            "Absolute Student error",
+            (0, 1),
+        ),
+    ]
+
+    for ax, (arr, label, lim) in zip(axes.flat, items):
+        if lim is None:
+            ax.imshow(arr)
+        else:
+            ax.imshow(
+                arr,
+                vmin=lim[0],
+                vmax=lim[1],
+            )
+        ax.set_title(label)
+        ax.axis("off")
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
+@torch.no_grad()
+def run_automatic_post_training_trace(
+    *,
+    args,
+    device: torch.device,
+    images: list,
+    final_teacher: nn.Module,
+    final_student_wrapper,
     out_dir: Path,
-    epoch: int,
-    batch_i: int,
-    saved_so_far: int,
-    max_images: int,
-) -> int:
-    """Save label-free BDL diagnostic panels for model understanding."""
-    if saved_so_far >= max_images:
-        return saved_so_far
+) -> None:
+    """Automatic post-training Teacher/Student audit and two paper-style tables.
 
-    import matplotlib.pyplot as plt
+    Target GT is first touched here, after all Stage-2 optimization and checkpoint
+    serialization have finished. Therefore it cannot affect adaptation.
+    """
+    trace_dir = out_dir / "final_analysis"
+    panel_dir = trace_dir / "panels"
+    panel_dir.mkdir(parents=True, exist_ok=True)
 
-    vis_dir = out_dir / "bdl_debug"
-    vis_dir.mkdir(parents=True, exist_ok=True)
+    mask_root = trace_dir / "masks"
+    mask_dirs = {
+        "gt": mask_root / "gt",
+        "initial_o2o": mask_root / "initial_teacher_o2o",
+        "initial_fused": mask_root / "initial_teacher_fused",
+        "final_o2o": mask_root / "final_teacher_o2o",
+        "final_fused": mask_root / "final_teacher_fused",
+        "final_o2m": mask_root / "final_teacher_o2m_witness",
+        "final_rescue": mask_root / "final_teacher_o2m_rescue",
+        "final_evidence": mask_root / "final_teacher_evidence",
+        "final_safe_bg": mask_root / "final_teacher_safe_background",
+        "signed_delta_png": mask_root / "final_signed_delta_vis",
+        "signed_delta_npy": mask_root / "final_signed_delta_npy",
+        "student": mask_root / "final_student",
+        "student_error": mask_root / "student_absolute_error",
+    }
+    for d in mask_dirs.values():
+        d.mkdir(parents=True, exist_ok=True)
 
-    for local_i, item in enumerate(debug_items):
-        if saved_so_far >= max_images:
-            break
+    analysis_images = images
+    if args.analysis_max_images > 0:
+        analysis_images = analysis_images[:args.analysis_max_images]
 
-        image = item["image"].float().clamp(0, 1)
-        if image.ndim != 3:
+    gt_dir = Path(args.analysis_gt_masks).resolve() if args.analysis_gt_masks else None
+    spacing_mm = (
+        float(args.analysis_spacing_mm_y),
+        float(args.analysis_spacing_mm_x),
+    )
+
+    initial_wrapper = YOLO(args.weights)
+    initial_teacher = initial_wrapper.model.to(device).float().eval()
+    for p in initial_teacher.parameters():
+        p.requires_grad = False
+
+    final_teacher.eval()
+    final_student_wrapper.model.eval()
+
+    rows: list[dict] = []
+
+    def teacher_route(model, x):
+        (_labels, _masks, _rel, _ps, routes) = generate_durr_pseudo_masks(
+            teacher=model,
+            weak_imgs=x,
+            tau_o2o=args.tau_o2o,
+            tau_o2m=args.tau_o2m,
+            tau_no=args.tau_no,
+            tau_dup=args.tau_dup,
+            tau_match=args.durr_tau_match,
+            max_witnesses=args.durr_max_witnesses,
+            mask_threshold=args.mask_thr,
+            stability_low=args.stability_low,
+            stability_high=args.stability_high,
+            reliability_threshold=args.mask_rel_thr,
+            min_mask_pixels=args.min_mask_pixels,
+            boundary_kernel=args.durr_boundary_kernel,
+            route_gain=args.durr_route_gain,
+            route_min_disagreement=args.durr_min_disagreement,
+            rescue_conf=args.durr_rescue_conf,
+            rescue_stability=args.durr_rescue_stability,
+            rescue_consensus_iou=args.durr_rescue_consensus_iou,
+            rescue_min_support=args.durr_rescue_min_support,
+            evidence_conf=args.durr_evidence_conf,
+            safe_bg_teacher_prob=args.durr_safe_bg_teacher_prob,
+        )
+        return routes[0]
+
+    stages = {
+        "initial_o2o": "Initial Teacher O2O",
+        "initial_fused": "Initial Teacher Fused",
+        "final_teacher": "Final EMA Teacher Fused",
+        "student": "Final Student",
+    }
+
+    for idx, image_path in enumerate(analysis_images, 1):
+        image_path = Path(image_path)
+        bgr = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if bgr is None:
+            print("[WARN analysis] cannot read", image_path)
             continue
-        image_np = image.permute(1, 2, 0).numpy()
-        h, w = image_np.shape[:2]
 
-        def up(name):
-            x = item[name].float()[None, None]
-            return F.interpolate(
-                x,
-                size=(h, w),
-                mode="bilinear",
-                align_corners=False,
-            )[0, 0].numpy()
+        x_cpu, meta = _analysis_letterbox(bgr, args.imgsz)
+        x = x_cpu.unsqueeze(0).to(device)
 
-        maps = [
-            ("O2O hard", up("o2o_hard"), "gray"),
-            ("O2M witnesses", up("o2m_witness"), "viridis"),
-            ("Disagreement", up("disagreement"), "magma"),
-            ("Inner boundary", up("boundary"), "gray"),
-            ("Soft target", up("soft_target"), "viridis"),
+        r0 = teacher_route(initial_teacher, x)
+        rT = teacher_route(final_teacher, x)
+
+        initial_vis = {
+            "o2o": _analysis_restore(r0["o2o_union"], meta, binary=True),
+            "fused": _analysis_restore(r0["fused_union"], meta, binary=True),
+        }
+        final_vis = {
+            "o2o": _analysis_restore(rT["o2o_union"], meta, binary=True),
+            "fused": _analysis_restore(rT["fused_union"], meta, binary=True),
+            "o2m_witness": _analysis_restore(rT["o2m_witness"], meta, binary=False),
+            "signed_delta": _analysis_restore(
+                rT["signed_delta"], meta, binary=False, clip_range=None
+            ),
+            "rescue": _analysis_restore(rT["rescue_mask"], meta, binary=True),
+            "evidence": _analysis_restore(rT["teacher_evidence"], meta, binary=False),
+            "safe_bg": _analysis_restore(rT["safe_bg_mask"].float(), meta, binary=True),
+        }
+
+        result = final_student_wrapper.predict(
+            source=str(image_path),
+            imgsz=args.imgsz,
+            conf=args.analysis_conf,
+            device=args.device,
+            verbose=False,
+        )[0]
+
+        gt = None
+        if gt_dir is not None:
+            gt_path = gt_dir / f"{image_path.stem}.png"
+            gt_raw = cv2.imread(str(gt_path), cv2.IMREAD_GRAYSCALE)
+            if gt_raw is None:
+                print("[WARN analysis] missing GT", gt_path)
+            else:
+                gt = (gt_raw > 0).astype(np.uint8)
+
+        h = int(gt.shape[0]) if gt is not None else int(bgr.shape[0])
+        w = int(gt.shape[1]) if gt is not None else int(bgr.shape[1])
+        student_mask = _analysis_student_union(result, h, w)
+
+        # Save masks automatically so no separate tracing script is needed.
+        stem = image_path.stem
+        if gt is not None:
+            _save_mask_png(mask_dirs["gt"] / f"{stem}.png", gt, binary=True)
+        _save_mask_png(mask_dirs["initial_o2o"] / f"{stem}.png", initial_vis["o2o"], binary=True)
+        _save_mask_png(mask_dirs["initial_fused"] / f"{stem}.png", initial_vis["fused"], binary=True)
+        _save_mask_png(mask_dirs["final_o2o"] / f"{stem}.png", final_vis["o2o"], binary=True)
+        _save_mask_png(mask_dirs["final_fused"] / f"{stem}.png", final_vis["fused"], binary=True)
+        _save_mask_png(mask_dirs["final_o2m"] / f"{stem}.png", final_vis["o2m_witness"])
+        _save_mask_png(mask_dirs["final_rescue"] / f"{stem}.png", final_vis["rescue"], binary=True)
+        _save_mask_png(mask_dirs["final_evidence"] / f"{stem}.png", final_vis["evidence"])
+        _save_mask_png(mask_dirs["final_safe_bg"] / f"{stem}.png", final_vis["safe_bg"], binary=True)
+        _save_signed_map(
+            mask_dirs["signed_delta_png"] / f"{stem}.png",
+            mask_dirs["signed_delta_npy"] / f"{stem}.npy",
+            final_vis["signed_delta"],
+        )
+        _save_mask_png(mask_dirs["student"] / f"{stem}.png", student_mask, binary=True)
+        if gt is not None:
+            err = np.abs(student_mask.astype(np.float32) - gt.astype(np.float32))
+            _save_mask_png(mask_dirs["student_error"] / f"{stem}.png", err)
+
+        title = image_path.name
+        row: dict = {
+            "image": image_path.name,
+            "final_teacher_rescue_pixels": int((final_vis["rescue"] > 0).sum()),
+            "final_teacher_route_pixels": int((np.abs(final_vis["signed_delta"]) >= args.durr_min_disagreement).sum()),
+            "final_teacher_expand_pixels": int((final_vis["signed_delta"] >= args.durr_min_disagreement).sum()),
+            "final_teacher_shrink_pixels": int((final_vis["signed_delta"] <= -args.durr_min_disagreement).sum()),
+            "final_teacher_safe_bg_fraction": float((final_vis["safe_bg"] > 0).mean()),
+        }
+
+        if gt is not None:
+            stage_masks = {
+                "initial_o2o": initial_vis["o2o"],
+                "initial_fused": initial_vis["fused"],
+                "final_teacher": final_vis["fused"],
+                "student": student_mask,
+            }
+            metrics = {
+                key: _analysis_metrics(mask, gt, spacing_mm=spacing_mm)
+                for key, mask in stage_masks.items()
+            }
+            for stage, m in metrics.items():
+                for key, value in m.items():
+                    row[f"{stage}_{key}"] = value
+
+            # Explicit deltas for quick diagnosis.
+            comparisons = {
+                "fusion": (metrics["initial_fused"], metrics["initial_o2o"]),
+                "teacher_drift": (metrics["final_teacher"], metrics["initial_fused"]),
+                "student_vs_initial": (metrics["student"], metrics["initial_fused"]),
+                "student_vs_final_teacher": (metrics["student"], metrics["final_teacher"]),
+            }
+            for name, (a, b) in comparisons.items():
+                for key in (
+                    "dice", "iou", "precision", "sensitivity", "specificity",
+                    "asd_heal_mm", "hd95_mm", "asd_px", "hd95_px",
+                ):
+                    row[f"{name}_delta_{key}"] = float(a[key]) - float(b[key])
+
+            title = (
+                f"{image_path.name} | "
+                f"T0-fused={metrics['initial_fused']['dice']:.4f} | "
+                f"Tfinal={metrics['final_teacher']['dice']:.4f} | "
+                f"Student={metrics['student']['dice']:.4f} | "
+                f"S-Tfinal={metrics['student']['dice']-metrics['final_teacher']['dice']:+.4f} | "
+                f"ASD_HEAL={metrics['student']['asd_heal_mm']:.2f}"
+            )
+
+        _save_post_training_panel(
+            panel_dir / f"{stem}.png",
+            bgr,
+            gt,
+            initial_vis,
+            final_vis,
+            student_mask,
+            title,
+        )
+        rows.append(row)
+
+        if idx == 1 or idx % 50 == 0 or idx == len(analysis_images):
+            print(f"[AUTO ANALYSIS] {idx}/{len(analysis_images)}", flush=True)
+
+    # Always save per-image trace as CSV + JSON.
+    _write_dict_csv(trace_dir / "per_image_trace.csv", rows)
+    (trace_dir / "per_image_trace.json").write_text(
+        json.dumps({"num_images": len(rows), "rows": rows}, indent=2),
+        encoding="utf-8",
+    )
+
+    summary: dict = {
+        "gt_used": gt_dir is not None,
+        "gt_policy": "post-training only; never used for adaptation/model selection",
+        "num_images": len(rows),
+        "asd_protocol": {
+            "reference": "HEAL BMVC 2025 -> Taha & Hanbury 2015",
+            "definition": "symmetric pooled mean of bidirectional nearest-surface distances",
+            "spacing_mm_y": spacing_mm[0],
+            "spacing_mm_x": spacing_mm[1],
+            "important_unit_note": (
+                "CVC-ClinicDB/Kvasir image files do not contain calibrated physical spacing. "
+                "Default (1.0,1.0) is an explicit unit-spacing convention; numerically it equals "
+                "pixels and must not be interpreted as measured physical millimetres unless true "
+                "spacing is supplied."
+            ),
+            "empty_policy": "one empty mask -> image diagonal; both empty -> 0",
+        },
+    }
+
+    # ------------------------------------------------------------
+    # TABLE 1: segmentation quality progression.
+    # ------------------------------------------------------------
+    table1_rows: list[dict] = []
+    if rows and gt_dir is not None:
+        table1_raw: list[dict] = []
+        for stage, label in stages.items():
+            r: dict = {"stage": label}
+            for metric in (
+                "dice", "iou", "precision", "sensitivity", "specificity",
+                "asd_heal_mm", "hd95_mm", "asd_px", "hd95_px",
+            ):
+                mu, sd = _mean_std(rows, f"{stage}_{metric}")
+                r[f"{metric}_mean"] = mu
+                r[f"{metric}_std"] = sd
+            r["pred_empty_count"] = int(sum(int(x.get(f"{stage}_pred_empty", 0)) for x in rows))
+            table1_raw.append(r)
+
+            table1_rows.append({
+                "stage": label,
+                "dice_pct": _fmt_mean_std(r["dice_mean"], r["dice_std"], scale=100.0, nd=2),
+                "iou_pct": _fmt_mean_std(r["iou_mean"], r["iou_std"], scale=100.0, nd=2),
+                "precision_pct": _fmt_mean_std(r["precision_mean"], r["precision_std"], scale=100.0, nd=2),
+                "sensitivity_pct": _fmt_mean_std(r["sensitivity_mean"], r["sensitivity_std"], scale=100.0, nd=2),
+                "specificity_pct": _fmt_mean_std(r["specificity_mean"], r["specificity_std"], scale=100.0, nd=2),
+                "asd_heal_mm": _fmt_mean_std(r["asd_heal_mm_mean"], r["asd_heal_mm_std"], nd=3),
+                "hd95_mm": _fmt_mean_std(r["hd95_mm_mean"], r["hd95_mm_std"], nd=3),
+                "pred_empty": r["pred_empty_count"],
+            })
+
+        _write_dict_csv(trace_dir / "table1_quality_progression_raw.csv", table1_raw)
+        _write_dict_csv(trace_dir / "table1_quality_progression.csv", table1_rows)
+        t1_cols = [
+            ("stage", "Stage"),
+            ("dice_pct", "Dice % ↑"),
+            ("iou_pct", "IoU % ↑"),
+            ("precision_pct", "Precision % ↑"),
+            ("sensitivity_pct", "Sensitivity % ↑"),
+            ("specificity_pct", "Specificity % ↑"),
+            ("asd_heal_mm", "ASD_HEAL (mm*) ↓"),
+            ("hd95_mm", "HD95 ↓"),
+            ("pred_empty", "Pred-empty"),
         ]
-
-        fig, axes = plt.subplots(1, 6, figsize=(18, 3.2))
-        axes[0].imshow(image_np)
-        axes[0].set_title("Target image")
-        axes[0].axis("off")
-
-        for ax, (title, arr, cmap) in zip(axes[1:], maps):
-            im = ax.imshow(arr, cmap=cmap, vmin=0.0, vmax=1.0)
-            ax.set_title(title)
-            ax.axis("off")
-            if title == "Disagreement":
-                fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-        stem = Path(str(paths[local_i])).stem if local_i < len(paths) else f"img{local_i}"
-        fig.suptitle(
-            f"BDL label-free diagnostic | epoch={epoch} batch={batch_i} | {stem}",
-            fontsize=11,
+        (trace_dir / "table1_quality_progression.md").write_text(
+            "# Table 1 — Segmentation quality progression\n\n"
+            + _markdown_table(table1_rows, t1_cols), encoding="utf-8"
         )
-        fig.tight_layout()
-        fig.savefig(
-            vis_dir / f"e{epoch:02d}_b{batch_i:03d}_{stem}.png",
-            dpi=160,
-            bbox_inches="tight",
-        )
-        plt.close(fig)
-        saved_so_far += 1
 
-    return saved_so_far
+        # --------------------------------------------------------
+        # TABLE 2: adaptation diagnosis / deltas.
+        # --------------------------------------------------------
+        comparison_defs = [
+            ("fusion", "Mask-DHF fusion: Initial Fused − Initial O2O"),
+            ("teacher_drift", "EMA Teacher drift: Final Teacher − Initial Fused"),
+            ("student_vs_initial", "Self-training: Final Student − Initial Fused"),
+            ("student_vs_final_teacher", "Student gap: Final Student − Final EMA Teacher"),
+        ]
+        table2_rows: list[dict] = []
+        table2_raw: list[dict] = []
+        for prefix, label in comparison_defs:
+            raw = {"comparison": label}
+            for metric in (
+                "dice", "iou", "precision", "sensitivity", "specificity",
+                "asd_heal_mm", "hd95_mm", "asd_px", "hd95_px",
+            ):
+                mu, sd = _mean_std(rows, f"{prefix}_delta_{metric}")
+                raw[f"delta_{metric}_mean"] = mu
+                raw[f"delta_{metric}_std"] = sd
+
+            dice_vals = np.asarray([float(x[f"{prefix}_delta_dice"]) for x in rows])
+            asd_vals = np.asarray([float(x[f"{prefix}_delta_asd_heal_mm"]) for x in rows])
+            tol = 1e-12
+            raw.update({
+                "dice_improved": int((dice_vals > tol).sum()),
+                "dice_worsened": int((dice_vals < -tol).sum()),
+                "dice_tied": int((np.abs(dice_vals) <= tol).sum()),
+                # Lower ASD is better, hence negative delta = improvement.
+                "asd_improved": int((asd_vals < -tol).sum()),
+                "asd_worsened": int((asd_vals > tol).sum()),
+                "asd_tied": int((np.abs(asd_vals) <= tol).sum()),
+            })
+            table2_raw.append(raw)
+            table2_rows.append({
+                "comparison": label,
+                "delta_dice_pp": _fmt_mean_std(raw["delta_dice_mean"], raw["delta_dice_std"], scale=100.0, nd=2),
+                "delta_iou_pp": _fmt_mean_std(raw["delta_iou_mean"], raw["delta_iou_std"], scale=100.0, nd=2),
+                "delta_sens_pp": _fmt_mean_std(raw["delta_sensitivity_mean"], raw["delta_sensitivity_std"], scale=100.0, nd=2),
+                "delta_spec_pp": _fmt_mean_std(raw["delta_specificity_mean"], raw["delta_specificity_std"], scale=100.0, nd=2),
+                "delta_asd_mm": _fmt_mean_std(raw["delta_asd_heal_mm_mean"], raw["delta_asd_heal_mm_std"], nd=3),
+                "delta_hd95_mm": _fmt_mean_std(raw["delta_hd95_mm_mean"], raw["delta_hd95_mm_std"], nd=3),
+                "dice_I_W_T": f"{raw['dice_improved']}/{raw['dice_worsened']}/{raw['dice_tied']}",
+                "asd_I_W_T": f"{raw['asd_improved']}/{raw['asd_worsened']}/{raw['asd_tied']}",
+            })
+
+        _write_dict_csv(trace_dir / "table2_adaptation_diagnostics_raw.csv", table2_raw)
+        _write_dict_csv(trace_dir / "table2_adaptation_diagnostics.csv", table2_rows)
+        t2_cols = [
+            ("comparison", "Comparison"),
+            ("delta_dice_pp", "ΔDice pp ↑"),
+            ("delta_iou_pp", "ΔIoU pp ↑"),
+            ("delta_sens_pp", "ΔSens pp ↑"),
+            ("delta_spec_pp", "ΔSpec pp ↑"),
+            ("delta_asd_mm", "ΔASD ↓"),
+            ("delta_hd95_mm", "ΔHD95 ↓"),
+            ("dice_I_W_T", "Dice I/W/T"),
+            ("asd_I_W_T", "ASD I/W/T"),
+        ]
+        (trace_dir / "table2_adaptation_diagnostics.md").write_text(
+            "# Table 2 — Adaptation diagnostics\n\n"
+            "I/W/T = improved / worsened / tied. For ASD/HD95, negative delta is better.\n\n"
+            + _markdown_table(table2_rows, t2_cols), encoding="utf-8"
+        )
+
+        summary["table1_quality_progression_raw"] = table1_raw
+        summary["table2_adaptation_diagnostics_raw"] = table2_raw
+
+    # Optional official Ultralytics post-training validation for final Student.
+    # This is performed only when the user explicitly supplies a target data YAML.
+    if args.analysis_data_yaml:
+        print("[AUTO VAL] final Student official mask metrics...", flush=True)
+        val_result = final_student_wrapper.val(
+            data=args.analysis_data_yaml,
+            imgsz=args.imgsz,
+            batch=args.analysis_batch,
+            device=args.device,
+            conf=args.analysis_conf,
+            verbose=False,
+        )
+        official = {}
+        results_dict = getattr(val_result, "results_dict", {}) or {}
+        for key, value in results_dict.items():
+            try:
+                official[str(key)] = float(value)
+            except Exception:
+                pass
+        summary["official_final_student_val"] = official
+        (trace_dir / "official_final_student_val.json").write_text(
+            json.dumps(official, indent=2), encoding="utf-8"
+        )
+
+    (trace_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
+
+    print("[AUTO ANALYSIS SAVED]", trace_dir)
+    if table1_rows:
+        print("[TABLE 1]", trace_dir / "table1_quality_progression.md")
+        print("[TABLE 2]", trace_dir / "table2_adaptation_diagnostics.md")
 
 
 def main():
     ap = argparse.ArgumentParser()
 
-    ap.add_argument(
-        "--weights",
-        required=True,
-    )
-
-    ap.add_argument(
-        "--target-images",
-        required=True,
-    )
-
+    ap.add_argument("--weights", required=True)
+    ap.add_argument("--target-images", required=True)
     ap.add_argument(
         "--out-dir",
-        default=(
-            "runs/seg/dense_sfseg/"
-            "cvc_dense"
-        ),
+        default="runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2",
     )
+    ap.add_argument("--imgsz", type=int, default=640)
+    ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--epochs", type=int, default=60)
+    ap.add_argument("--max-batches", type=int, default=0)
+    ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--grad-clip", type=float, default=10.0)
+    ap.add_argument("--ema", type=float, default=0.999)
 
-    ap.add_argument(
-        "--imgsz",
-        type=int,
-        default=640,
-    )
+    # Mask-DHF base.
+    ap.add_argument("--tau-o2o", type=float, default=0.5)
+    ap.add_argument("--tau-o2m", type=float, default=0.5)
+    ap.add_argument("--tau-no", type=float, default=0.2)
+    ap.add_argument("--tau-dup", type=float, default=0.7)
+    ap.add_argument("--mask-thr", type=float, default=0.5)
+    ap.add_argument("--stability-low", type=float, default=0.40)
+    ap.add_argument("--stability-high", type=float, default=0.60)
+    ap.add_argument("--mask-rel-thr", type=float, default=0.744898)
+    ap.add_argument("--min-mask-pixels", type=int, default=16)
 
+    # DURR matching / boundary routing.
+    ap.add_argument("--durr-tau-match", type=float, default=0.5)
+    ap.add_argument("--durr-max-witnesses", type=int, default=5)
+    ap.add_argument("--durr-boundary-kernel", type=int, default=5)
+    ap.add_argument("--durr-route-gain", type=float, default=1.0)
     ap.add_argument(
-        "--batch",
-        type=int,
-        default=4,
-    )
-
-    ap.add_argument(
-        "--workers",
-        type=int,
-        default=4,
-    )
-
-    ap.add_argument(
-        "--epochs",
-        type=int,
-        default=60,
-    )
-
-    ap.add_argument(
-        "--max-batches",
-        type=int,
-        default=0,
-        help="0 = all batches",
-    )
-
-    ap.add_argument(
-        "--lr",
+        "--durr-min-disagreement",
         type=float,
-        default=1e-4,
+        default=0.02,
     )
 
-    ap.add_argument(
-        "--grad-clip",
-        type=float,
-        default=10.0,
-    )
-
-    ap.add_argument(
-        "--ema",
-        type=float,
-        default=0.999,
-    )
-
-    # Mask-DHF
-    ap.add_argument(
-        "--tau-o2o",
-        type=float,
-        default=0.5,
-    )
-
-    ap.add_argument(
-        "--tau-o2m",
-        type=float,
-        default=0.5,
-    )
-
-    ap.add_argument(
-        "--tau-no",
-        type=float,
-        default=0.2,
-    )
-
-    ap.add_argument(
-        "--tau-dup",
-        type=float,
-        default=0.7,
-    )
-
-    ap.add_argument(
-        "--mask-thr",
-        type=float,
-        default=0.5,
-    )
-
-    ap.add_argument(
-        "--stability-low",
-        type=float,
-        default=0.40,
-    )
-
-    ap.add_argument(
-        "--stability-high",
-        type=float,
-        default=0.60,
-    )
-
-    ap.add_argument(
-        "--mask-rel-thr",
-        type=float,
-        default=0.744898,
-    )
-
-    ap.add_argument(
-        "--min-mask-pixels",
-        type=int,
-        default=16,
-    )
-
-    ap.add_argument(
-        "--dhf-mode",
-        choices=("mask", "cc", "bdl", "durr"),
-        default="mask",
-        help=(
-            "mask = current Mask-DHF; "
-            "cc = rejected simple consensus ablation; "
-            "bdl = cross-head Boundary-Disagreement Learning + Mask-DHF coverage; "
-            "durr = Dual-head Uncertainty Reliability Routing on top of BDL pseudo labels"
-        ),
-    )
-
-    ap.add_argument(
-        "--cc-tau-match",
-        type=float,
-        default=0.5,
-        help="Same-class box IoU threshold for O2M consensus witnesses.",
-    )
-
-    ap.add_argument(
-        "--cc-max-witnesses",
-        type=int,
-        default=5,
-        help=(
-            "Maximum O2M consensus witnesses per O2O anchor. "
-            "0 means unlimited."
-        ),
-    )
-
-    # Cross-head Boundary Disagreement Learning (BDL)
-    ap.add_argument(
-        "--bdl-tau-match",
-        type=float,
-        default=0.5,
-        help="Same-class O2M/O2O box IoU threshold for uncertainty witnesses.",
-    )
-    ap.add_argument(
-        "--bdl-max-witnesses",
-        type=int,
-        default=5,
-        help="Maximum O2M uncertainty witnesses per O2O anchor; 0 = unlimited.",
-    )
-    ap.add_argument(
-        "--bdl-boundary-kernel",
-        type=int,
-        default=3,
-        help="Odd erosion kernel defining the inner O2O pseudo-mask boundary.",
-    )
-    ap.add_argument(
-        "--bdl-debug-vis",
-        action="store_true",
-        help="Save label-free O2O/O2M/disagreement/boundary/soft-target panels.",
-    )
-    ap.add_argument(
-        "--bdl-debug-max-images",
-        type=int,
-        default=8,
-        help="Maximum BDL diagnostic panels saved for a run.",
-    )
-
-    # DURR: Dual-head Uncertainty Reliability Routing
-    ap.add_argument(
-        "--durr-boundary-kernel",
-        type=int,
-        default=5,
-        help="Odd kernel for the two-sided DURR boundary band.",
-    )
-    ap.add_argument(
-        "--durr-direction-min-abs",
-        type=float,
-        default=0.03,
-        help="Minimum absolute signed O2O/O2M disagreement used for routing.",
-    )
-    ap.add_argument(
-        "--durr-direction-margin",
-        type=float,
-        default=0.05,
-        help="Required Student movement along the signed Teacher direction.",
-    )
-    ap.add_argument(
-        "--durr-rescue-conf",
-        type=float,
-        default=0.80,
-        help="Minimum O2M confidence for reliable rescue when native O2O is empty.",
-    )
+    # DURR O2M rescue.
+    ap.add_argument("--durr-rescue-conf", type=float, default=0.80)
     ap.add_argument(
         "--durr-rescue-stability",
         type=float,
         default=0.80,
-        help="Minimum O2M mask threshold-stability for reliable rescue.",
     )
     ap.add_argument(
-        "--durr-evidence-conf-floor",
+        "--durr-rescue-consensus-iou",
         type=float,
-        default=0.10,
-        help="Low confidence floor used only to build conservative Teacher evidence maps.",
+        default=0.70,
     )
+    ap.add_argument(
+        "--durr-rescue-min-support",
+        type=int,
+        default=0,
+        help=(
+            "0 = high-conf+stable rescue may stand alone; "
+            "1 = require at least one additional O2M mask with consensus IoU."
+        ),
+    )
+
+    # Safe teacher evidence / hallucination.
+    ap.add_argument("--durr-evidence-conf", type=float, default=0.10)
     ap.add_argument(
         "--durr-safe-bg-teacher-prob",
         type=float,
-        default=0.15,
-        help="Both Teacher heads must be below this probability to mark safe background.",
+        default=0.10,
     )
     ap.add_argument(
-        "--durr-hall-student-prob",
+        "--durr-hall-student-thr",
         type=float,
-        default=0.70,
-        help="Student foreground confidence defining hallucinated pixels.",
+        default=0.80,
     )
     ap.add_argument(
         "--durr-hall-area-thr",
         type=float,
         default=0.10,
-        help="Trigger hallucination suppression if high-conf Student FG exceeds this image fraction.",
     )
     ap.add_argument(
-        "--durr-lambda-direction",
+        "--durr-hall-area-weight",
         type=float,
-        default=0.20,
+        default=0.25,
     )
-    ap.add_argument(
-        "--durr-lambda-rescue",
-        type=float,
-        default=0.50,
-    )
-    ap.add_argument(
-        "--durr-lambda-hall",
-        type=float,
-        default=0.20,
-    )
+
+    # DURR loss weights.
+    ap.add_argument("--durr-lambda-dir", type=float, default=0.10)
+    ap.add_argument("--durr-lambda-rescue", type=float, default=0.20)
+    ap.add_argument("--durr-lambda-hall", type=float, default=0.10)
     ap.add_argument(
         "--durr-warmup-epochs",
-        type=float,
-        default=3.0,
-        help="Linear DURR loss warmup.",
-    )
-
-    # MARD
-    ap.add_argument(
-        "--mard-lambda0",
-        type=float,
-        default=0.05,
-    )
-
-    ap.add_argument(
-        "--mard-lambda-max",
-        type=float,
-        default=0.2,
-    )
-
-    ap.add_argument(
-        "--mard-gamma",
-        type=float,
-        default=1.0,
-    )
-
-    ap.add_argument(
-        "--mard-alpha",
-        type=float,
-        default=1.0,
-    )
-
-    ap.add_argument(
-        "--mard-beta",
-        type=float,
-        default=0.1,
-    )
-
-    ap.add_argument(
-        "--mard-warmup-epochs",
         type=float,
         default=5.0,
     )
 
-    ap.add_argument(
-        "--mard-gate-threshold",
-        type=float,
-        default=0.5,
-    )
-
-    ap.add_argument(
-        "--mard-topk-boxes",
-        type=int,
-        default=15,
-    )
-
-    ap.add_argument(
-        "--mard-fg-points",
-        type=int,
-        default=8,
-    )
-
-    ap.add_argument(
-        "--mard-bg-points",
-        type=int,
-        default=128,
-    )
-
-    ap.add_argument(
-        "--mard-eta",
-        type=float,
-        default=12.0,
-    )
-
-    ap.add_argument(
-        "--mard-box-conf",
-        type=float,
-        default=0.5,
-    )
-
-    ap.add_argument(
-        "--mard-mode",
-        choices=("box", "mask"),
-        default="mask",
-        help=(
-            "box = original pseudo-box-guided MARD; "
-            "mask = segmentation-guided SegMARD"
-        ),
-    )
-
+    # SegMARD-v2.
+    ap.add_argument("--mard-lambda0", type=float, default=0.05)
+    ap.add_argument("--mard-lambda-max", type=float, default=0.2)
+    ap.add_argument("--mard-gamma", type=float, default=1.0)
+    ap.add_argument("--mard-alpha", type=float, default=1.0)
+    ap.add_argument("--mard-beta", type=float, default=0.1)
+    ap.add_argument("--mard-warmup-epochs", type=float, default=5.0)
+    ap.add_argument("--mard-gate-threshold", type=float, default=0.5)
+    ap.add_argument("--mard-topk-boxes", type=int, default=15)
+    ap.add_argument("--mard-fg-points", type=int, default=8)
+    ap.add_argument("--mard-bg-points", type=int, default=128)
+    ap.add_argument("--mard-eta", type=float, default=12.0)
+    ap.add_argument("--mard-box-conf", type=float, default=0.5)
     add_segmard_args(ap)
 
-    ap.add_argument(
-        "--device",
-        default="0",
-    )
+    ap.add_argument("--device", default="0")
+    ap.add_argument("--seed", type=int, default=29)
+    ap.add_argument("--print-freq", type=int, default=10)
+    ap.add_argument("--save-interval", type=int, default=10)
 
+    # Automatic post-training trace. GT is read ONLY after all training,
+    # checkpoint saving, and EMA updates are finished.
     ap.add_argument(
-        "--seed",
-        type=int,
-        default=29,
-    )
-
-    ap.add_argument(
-        "--print-freq",
-        type=int,
-        default=10,
-    )
-
-    ap.add_argument(
-        "--save-interval",
-        type=int,
-        default=10,
-    )
-
-    ap.add_argument(
-        "--post-trace-gt-masks",
+        "--analysis-gt-masks",
         default=None,
         help=(
-            "OPTIONAL evaluation-only GT mask directory. If provided, after the "
-            "final checkpoint is frozen the training script automatically runs "
-            "Teacher-vs-Student tracing; GT is never read during adaptation."
+            "Optional GT-mask directory for automatic POST-TRAINING "
+            "Teacher/Student visualization. Never read during adaptation."
         ),
     )
     ap.add_argument(
-        "--post-trace-max-images",
+        "--analysis-conf",
+        type=float,
+        default=0.25,
+    )
+    ap.add_argument(
+        "--analysis-data-yaml",
+        default=None,
+        help=(
+            "Optional target dataset YAML for automatic POST-TRAINING Ultralytics "
+            "mask mAP validation. Labels are never read during adaptation."
+        ),
+    )
+    ap.add_argument(
+        "--analysis-batch",
+        type=int,
+        default=8,
+        help="Batch size for optional post-training official val.",
+    )
+    ap.add_argument(
+        "--analysis-spacing-mm-y",
+        type=float,
+        default=1.0,
+        help=(
+            "Physical row spacing for HEAL/Taha-Hanbury ASD. CVC/Kvasir do not "
+            "ship calibrated spacing, so 1.0 is an explicit unit-spacing convention."
+        ),
+    )
+    ap.add_argument(
+        "--analysis-spacing-mm-x",
+        type=float,
+        default=1.0,
+        help="Physical column spacing for HEAL/Taha-Hanbury ASD.",
+    )
+    ap.add_argument(
+        "--analysis-max-images",
         type=int,
         default=0,
-        help="0 = trace all target images after training; otherwise limit count.",
+        help="0 = analyze all target images after training.",
     )
 
     args = ap.parse_args()
 
-    seed_everything(
-        args.seed
-    )
+    if args.analysis_spacing_mm_y <= 0 or args.analysis_spacing_mm_x <= 0:
+        raise ValueError("analysis spacing must be positive")
 
-    device = resolve_device(
-        args.device
-    )
+    seed_everything(args.seed)
+    device = resolve_device(args.device)
 
     images = list_images(
-        Path(
-            args.target_images
-        ).resolve()
+        Path(args.target_images).resolve()
     )
-
-    dataset = TargetMTDataset(
-        images,
-        args.imgsz,
-    )
-
+    dataset = TargetMTDataset(images, args.imgsz)
     loader = DataLoader(
         dataset,
         batch_size=args.batch,
         shuffle=True,
         num_workers=args.workers,
-        pin_memory=(
-            device.type == "cuda"
-        ),
+        pin_memory=device.type == "cuda",
         drop_last=False,
         collate_fn=collate,
     )
@@ -1313,6 +1132,9 @@ def main():
         epochs=args.epochs,
     )
 
+    # Keep an unfused wrapper available to serialize the EMA Teacher.
+    teacher_wrapper = YOLO(args.weights)
+
     optimizer = optim.SGD(
         student.parameters(),
         lr=args.lr,
@@ -1320,879 +1142,382 @@ def main():
         weight_decay=0.0005,
         nesterov=True,
     )
-
-    scheduler = (
-        optim.lr_scheduler
-        .CosineAnnealingLR(
-            optimizer,
-            T_max=args.epochs,
-            eta_min=(
-                args.lr * 0.01
-            ),
-        )
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=args.epochs,
+        eta_min=args.lr * 0.01,
     )
 
-    out_dir = Path(
-        args.out_dir
-    ).resolve()
+    out_dir = Path(args.out_dir).resolve()
+    ckpt_dir = out_dir / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoint_dir = (
-        out_dir
-        / "checkpoints"
-    )
+    hook = SegmentInputFeatureHook(student)
 
-    checkpoint_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    hook = SegmentInputFeatureHook(
-        student
-    )
-
-    print("=" * 72)
-    print("DENSE MEDRT-SFSEG STAGE-2")
-    print("=" * 72)
-
+    print("=" * 78)
+    print("MEDRT-SFSEG STAGE-2 | DURR-v1 + SegMARD-v2")
+    print("=" * 78)
     print("target images :", len(images))
     print("labels used   : NO")
     print("GT masks used : NO")
     print("epochs        :", args.epochs)
     print("batch         :", args.batch)
-
     print()
+    print("DURR          : ON")
     print(
-        "DHF mode      :",
-        args.dhf_mode,
+        "signed route  : match",
+        args.durr_tau_match,
+        "| band",
+        args.durr_boundary_kernel,
+        "| min|Δ|",
+        args.durr_min_disagreement,
     )
     print(
-        "Mask-DHF rel  :",
-        args.mask_rel_thr,
+        "O2M rescue    : conf",
+        args.durr_rescue_conf,
+        "| stab",
+        args.durr_rescue_stability,
+        "| support",
+        args.durr_rescue_min_support,
     )
-
     print(
-        "stability     :",
-        args.stability_low,
-        args.stability_high,
+        "hall suppress : P_s>=",
+        args.durr_hall_student_thr,
+        "| area>",
+        args.durr_hall_area_thr,
+        "| safe Teacher P<",
+        args.durr_safe_bg_teacher_prob,
     )
-
-    if args.dhf_mode == "cc":
-        print(
-            "CC match IoU :",
-            args.cc_tau_match,
-        )
-        print(
-            "CC witnesses :",
-            args.cc_max_witnesses,
-        )
-        print(
-            "CC fusion    : branch-balanced consensus",
-        )
-    elif args.dhf_mode == "bdl":
-        print("BDL match IoU:", args.bdl_tau_match)
-        print("BDL witnesses:", args.bdl_max_witnesses)
-        print("BDL boundary : inner mask band, kernel", args.bdl_boundary_kernel)
-        print("BDL signal   : weighted O2O/O2M pixel-wise |P_o2o-P_o2m|")
-        print("BDL target   : hard geometry + disagreement-softened inner boundary")
-        print("BDL coverage : original Mask-DHF for unmatched novel O2M extras")
-    elif args.dhf_mode == "durr":
-        print("DURR base    : BDL pseudo labels + Mask-DHF coverage")
-        print("DURR signed  : r_m*P_o2m - r_o*P_o2o")
-        print("DURR band    : two-sided, kernel", args.durr_boundary_kernel)
-        print("DURR rescue  : conf>=", args.durr_rescue_conf, "stab>=", args.durr_rescue_stability)
-        print("DURR safe BG : Teacher evidence <", args.durr_safe_bg_teacher_prob)
-        print("DURR lambdas :", args.durr_lambda_direction, args.durr_lambda_rescue, args.durr_lambda_hall)
-        print("DURR warmup  :", args.durr_warmup_epochs, "epochs")
-
-    print()
     print(
-        "MARD lambda0  :",
-        args.mard_lambda0,
+        "DURR lambdas  :",
+        args.durr_lambda_dir,
+        args.durr_lambda_rescue,
+        args.durr_lambda_hall,
     )
-
     print(
-        "MARD warmup   :",
-        args.mard_warmup_epochs,
-    )
-
-    print(
-        "MARD mode     :",
-        args.mard_mode,
-    )
-
-    if args.mard_mode == "box":
-        print(
-            "FG definition : inside pseudo bounding box"
-        )
-        print(
-            "BG definition : outside pseudo bounding boxes"
-        )
-    else:
-        print(
-            "FG definition : inside Teacher pseudo segmentation mask"
-        )
-        print(
-            "FG erosion    :",
-            args.segmard_erode_kernel,
-        )
-        print(
-            "mask dilation :",
-            args.segmard_dilate_kernel,
-        )
-        print(
-            "hard BG ratio :",
-            args.segmard_hard_bg_ratio,
-        )
-        print(
-            "reliability wt:",
-            "ON"
-            if args.segmard_reliability_weighting
-            else "OFF",
-        )
-
-    print(
-        "var/cov obj.   : "
-        + (
-            "reliability-weighted"
-            if (
-                args.mard_mode == "mask"
-                and args.segmard_reliability_weighting
-            )
-            else "unchanged"
-        )
+        "SegMARD-v2    : hard-bg-ratio",
+        args.segmard_hard_bg_ratio,
+        "| reliability weighting",
+        args.segmard_reliability_weighting,
     )
 
     global_step = 0
-    bdl_debug_saved = 0
-    final_ckpt = None
-    bdl_history = out_dir / "bdl_diagnostics.jsonl"
-    durr_history = out_dir / "durr_diagnostics.jsonl"
-    if args.dhf_mode == "bdl" and bdl_history.exists():
-        bdl_history.unlink()
-    if args.dhf_mode == "durr" and durr_history.exists():
-        durr_history.unlink()
 
     try:
-        for epoch in range(
-            args.epochs
-        ):
+        for epoch in range(args.epochs):
             student.train()
+            start = time.time()
 
             successful = 0
             skipped = 0
 
             totals = {
                 "loss": 0.0,
-                "seg_loss": 0.0,
-                "semseg_loss": 0.0,
+                "sfseg": 0.0,
+                "seg": 0.0,
+                "semseg": 0.0,
                 "mard": 0.0,
-                "lambda": 0.0,
+                "lambda_mard": 0.0,
+                "dir": 0.0,
+                "rescue": 0.0,
+                "hall": 0.0,
+                "lambda_durr": 0.0,
                 "pseudo": 0,
                 "anchors": 0,
-                "box_extras": 0,
                 "mask_extras": 0,
-                "rejected_rel": 0,
-                "consensus_anchors": 0,
-                "consensus_witnesses": 0,
-                "consensus_fallbacks": 0,
-                "consensus_shift_sum": 0.0,
-                "consensus_shift_count": 0,
-                "consensus_mask_iou_sum": 0.0,
-                "consensus_mask_iou_count": 0,
-                "bdl_anchors": 0,
-                "bdl_witnesses": 0,
-                "bdl_boundary_fallbacks": 0,
-                "bdl_boundary_disagreement_sum": 0.0,
-                "bdl_boundary_disagreement_count": 0,
-                "bdl_interior_disagreement_sum": 0.0,
-                "bdl_interior_disagreement_count": 0,
-                "bdl_soft_target_shift_sum": 0.0,
-                "bdl_soft_target_shift_count": 0,
-                "bdl_boundary_pixels": 0,
-                "bdl_interior_pixels": 0,
-                "durr_loss": 0.0,
-                "durr_dir_loss": 0.0,
-                "durr_rescue_loss": 0.0,
-                "durr_hall_loss": 0.0,
-                "durr_direction_pixels": 0.0,
-                "durr_rescue_pixels": 0.0,
-                "durr_hall_pixels": 0.0,
-                "durr_hall_trigger_images": 0.0,
-                "durr_teacher_empty_images": 0,
-                "durr_rescue_images": 0,
-                "durr_rescue_instances": 0,
+                "reject_rel": 0,
+                "matched_anchors": 0,
+                "witnesses": 0,
+                "rescue_instances": 0,
+                "teacher_empty_images": 0,
+                "dir_pixels": 0.0,
+                "expand_pixels": 0.0,
+                "shrink_pixels": 0.0,
+                "hall_triggered": 0.0,
+                "hall_pixels": 0.0,
                 "fg_tokens": 0.0,
                 "hard_bg_tokens": 0.0,
                 "easy_bg_tokens": 0.0,
-                "core_fallbacks": 0.0,
-                "rel_sum": 0.0,
-                "rel_count": 0,
-                "rel_min": 1.0,
-                "rel_max": 0.0,
-                "token_weight_sum": 0.0,
             }
 
-            start = time.time()
-
-            for batch_i, (
-                weak,
-                strong,
-                _paths,
-            ) in enumerate(
+            for batch_i, (weak, strong, _paths) in enumerate(
                 loader,
                 start=1,
             ):
                 if (
                     args.max_batches > 0
-                    and batch_i
-                    > args.max_batches
+                    and batch_i > args.max_batches
                 ):
                     break
 
-                weak = weak.to(
-                    device,
-                    non_blocking=True,
+                weak = weak.to(device, non_blocking=True)
+                strong = strong.to(device, non_blocking=True)
+
+                (
+                    labels,
+                    masks,
+                    reliabilities,
+                    ps,
+                    routes,
+                ) = generate_durr_pseudo_masks(
+                    teacher=teacher,
+                    weak_imgs=weak,
+                    tau_o2o=args.tau_o2o,
+                    tau_o2m=args.tau_o2m,
+                    tau_no=args.tau_no,
+                    tau_dup=args.tau_dup,
+                    tau_match=args.durr_tau_match,
+                    max_witnesses=args.durr_max_witnesses,
+                    mask_threshold=args.mask_thr,
+                    stability_low=args.stability_low,
+                    stability_high=args.stability_high,
+                    reliability_threshold=args.mask_rel_thr,
+                    min_mask_pixels=args.min_mask_pixels,
+                    boundary_kernel=args.durr_boundary_kernel,
+                    route_gain=args.durr_route_gain,
+                    route_min_disagreement=args.durr_min_disagreement,
+                    rescue_conf=args.durr_rescue_conf,
+                    rescue_stability=args.durr_rescue_stability,
+                    rescue_consensus_iou=args.durr_rescue_consensus_iou,
+                    rescue_min_support=args.durr_rescue_min_support,
+                    evidence_conf=args.durr_evidence_conf,
+                    safe_bg_teacher_prob=args.durr_safe_bg_teacher_prob,
                 )
-
-                strong = strong.to(
-                    device,
-                    non_blocking=True,
-                )
-
-                bdl_debug_items = None
-                durr_routes = None
-
-                if args.dhf_mode == "mask":
-                    (
-                        labels,
-                        geometry_masks,
-                        instance_reliabilities,
-                        ps,
-                    ) = generate_mask_dhf_pseudo_masks(
-                        teacher,
-                        weak,
-                        tau_o2o=args.tau_o2o,
-                        tau_o2m=args.tau_o2m,
-                        tau_no=args.tau_no,
-                        tau_dup=args.tau_dup,
-                        mask_threshold=args.mask_thr,
-                        stability_low=args.stability_low,
-                        stability_high=args.stability_high,
-                        reliability_threshold=args.mask_rel_thr,
-                        min_mask_pixels=args.min_mask_pixels,
-                        return_instance_reliability=True,
-                    )
-                    supervision_masks = geometry_masks
-
-                elif args.dhf_mode == "cc":
-                    (
-                        labels,
-                        geometry_masks,
-                        instance_reliabilities,
-                        ps,
-                    ) = generate_cc_dhf_pseudo_masks(
-                        teacher,
-                        weak,
-                        tau_o2o=args.tau_o2o,
-                        tau_o2m=args.tau_o2m,
-                        tau_no=args.tau_no,
-                        tau_dup=args.tau_dup,
-                        tau_match=args.cc_tau_match,
-                        max_consensus_witnesses=args.cc_max_witnesses,
-                        mask_threshold=args.mask_thr,
-                        stability_low=args.stability_low,
-                        stability_high=args.stability_high,
-                        reliability_threshold=args.mask_rel_thr,
-                        min_mask_pixels=args.min_mask_pixels,
-                        return_instance_reliability=True,
-                    )
-                    supervision_masks = geometry_masks
-
-                elif args.dhf_mode == "bdl":
-                    bdl_result = generate_boundary_dhf_pseudo_masks(
-                        teacher,
-                        weak,
-                        tau_o2o=args.tau_o2o,
-                        tau_o2m=args.tau_o2m,
-                        tau_no=args.tau_no,
-                        tau_dup=args.tau_dup,
-                        tau_match=args.bdl_tau_match,
-                        max_witnesses=args.bdl_max_witnesses,
-                        mask_threshold=args.mask_thr,
-                        stability_low=args.stability_low,
-                        stability_high=args.stability_high,
-                        reliability_threshold=args.mask_rel_thr,
-                        min_mask_pixels=args.min_mask_pixels,
-                        boundary_kernel=args.bdl_boundary_kernel,
-                        return_debug=(
-                            args.bdl_debug_vis
-                            and bdl_debug_saved < args.bdl_debug_max_images
-                        ),
-                    )
-                    if len(bdl_result) == 6:
-                        (
-                            labels,
-                            supervision_masks,
-                            geometry_masks,
-                            instance_reliabilities,
-                            ps,
-                            bdl_debug_items,
-                        ) = bdl_result
-                    else:
-                        (
-                            labels,
-                            supervision_masks,
-                            geometry_masks,
-                            instance_reliabilities,
-                            ps,
-                        ) = bdl_result
-                    durr_routes = None
-
-                else:
-                    (
-                        labels,
-                        supervision_masks,
-                        geometry_masks,
-                        instance_reliabilities,
-                        ps,
-                        durr_routes,
-                    ) = generate_durr_pseudo_masks(
-                        teacher=teacher,
-                        weak_imgs=weak,
-                        tau_o2o=args.tau_o2o,
-                        tau_o2m=args.tau_o2m,
-                        tau_no=args.tau_no,
-                        tau_dup=args.tau_dup,
-                        tau_match=args.bdl_tau_match,
-                        max_witnesses=args.bdl_max_witnesses,
-                        mask_threshold=args.mask_thr,
-                        stability_low=args.stability_low,
-                        stability_high=args.stability_high,
-                        reliability_threshold=args.mask_rel_thr,
-                        min_mask_pixels=args.min_mask_pixels,
-                        bdl_boundary_kernel=args.bdl_boundary_kernel,
-                        durr_boundary_kernel=args.durr_boundary_kernel,
-                        durr_direction_min_abs=args.durr_direction_min_abs,
-                        durr_rescue_conf=args.durr_rescue_conf,
-                        durr_rescue_stability=args.durr_rescue_stability,
-                        durr_evidence_conf_floor=args.durr_evidence_conf_floor,
-                        durr_safe_bg_teacher_prob=args.durr_safe_bg_teacher_prob,
-                    )
-
-                if not (
-                    len(labels)
-                    == len(supervision_masks)
-                    == len(geometry_masks)
-                    == len(instance_reliabilities)
-                ):
-                    raise RuntimeError(
-                        "DHF/BDL batch output lengths are misaligned"
-                    )
-
-                for bi_align in range(len(labels)):
-                    n_lab = int(labels[bi_align].shape[0])
-                    n_sup = int(supervision_masks[bi_align].shape[0])
-                    n_geo = int(geometry_masks[bi_align].shape[0])
-                    n_rel = int(instance_reliabilities[bi_align].shape[0])
-                    if not (n_lab == n_sup == n_geo == n_rel):
-                        raise RuntimeError(
-                            f"DHF/BDL image {bi_align}: labels={n_lab} "
-                            f"supervision={n_sup} geometry={n_geo} rel={n_rel}"
-                        )
 
                 valid = [
-                    i
-                    for i, x
-                    in enumerate(labels)
+                    i for i, x in enumerate(labels)
                     if x.shape[0] > 0
                 ]
-
-                # Non-DURR baselines keep the original behavior: teacher-empty
-                # batches do not update the Student.
-                if not valid and args.dhf_mode != "durr":
-                    skipped += 1
-                    global_step += 1
-                    continue
-
-                # Lists aligned to pseudo-valid images. They may be empty in
-                # DURR mode; teacher-empty images can still contribute L_hall.
-                strong_valid = strong[valid] if valid else strong[:0]
-                labels_valid = [labels[i] for i in valid]
-                supervision_masks_valid = [
-                    supervision_masks[i] for i in valid
-                ]
-                geometry_masks_valid = [
-                    geometry_masks[i] for i in valid
-                ]
-                reliabilities_valid = [
-                    instance_reliabilities[i] for i in valid
+                empty = [
+                    i for i, x in enumerate(labels)
+                    if x.shape[0] == 0
                 ]
 
-                if reliabilities_valid:
-                    rel_cat = torch.cat(
-                        [
-                            r.detach().float().flatten()
-                            for r in reliabilities_valid
-                            if r.numel()
-                        ],
-                        dim=0,
-                    )
-                else:
-                    rel_cat = strong.new_zeros((0,))
+                optimizer.zero_grad(set_to_none=True)
 
-                if rel_cat.numel():
-                    batch_rel_mean = float(rel_cat.mean().item())
-                    batch_rel_min = float(rel_cat.min().item())
-                    batch_rel_max = float(rel_cat.max().item())
-                else:
-                    batch_rel_mean = 0.0
-                    batch_rel_min = 0.0
-                    batch_rel_max = 0.0
+                zero = next(student.parameters()).new_zeros(())
+                sfseg_loss = zero
+                mard_loss = zero
+                dir_loss = zero
+                rescue_loss = zero
+                hall_loss = zero
+                lambda_mard = 0.0
 
-                if (
-                    args.dhf_mode == "bdl"
-                    and args.bdl_debug_vis
-                    and bdl_debug_items is not None
-                    and valid
-                ):
-                    valid_debug = [
-                        bdl_debug_items[i]
-                        for i in valid
-                    ]
-                    valid_paths = [
-                        _paths[i]
-                        for i in valid
-                    ]
-                    bdl_debug_saved = save_bdl_debug_panels(
-                        valid_debug,
-                        valid_paths,
-                        out_dir,
-                        epoch + 1,
-                        batch_i,
-                        bdl_debug_saved,
-                        args.bdl_debug_max_images,
-                    )
-
-                avg_conf = (
-                    average_confidence(labels_valid)
-                    if labels_valid
-                    else 0.0
+                loss_items = torch.zeros(
+                    5,
+                    device=device,
                 )
+                mard_stats = {}
+                dir_stats = {}
+                rescue_stats = {}
+                hall_stats = {}
 
-                hook.latest = None
+                # ----------------------------------------------------
+                # Standard pseudo-supervised images.
+                # ----------------------------------------------------
+                if valid:
+                    strong_valid = strong[valid]
+                    labels_valid = [labels[i] for i in valid]
+                    masks_valid = [masks[i] for i in valid]
+                    rel_valid = [reliabilities[i] for i in valid]
+                    routes_valid = [routes[i] for i in valid]
 
-                if args.dhf_mode == "durr":
-                    # ONE Student forward over the full batch. This is critical:
-                    # teacher-empty images must remain visible to DURR.
-                    student_outputs_all = student(strong)
-                    feats_all = hook.latest
-
-                    if feats_all is None:
-                        raise RuntimeError(
-                            "DURR/MARD feature hook captured no features"
-                        )
-
-                    warmup_scale = durr_warmup_scale(
-                        epoch,
-                        batch_i - 1,
-                        len(loader),
-                        args.durr_warmup_epochs,
-                    )
-                    durr_loss, durr_stats = compute_durr_loss(
-                        student_outputs_all,
-                        durr_routes,
-                        direction_margin=args.durr_direction_margin,
-                        lambda_direction=args.durr_lambda_direction,
-                        lambda_rescue=args.durr_lambda_rescue,
-                        lambda_hallucination=args.durr_lambda_hall,
-                        hall_student_prob=args.durr_hall_student_prob,
-                        hall_area_threshold=args.durr_hall_area_thr,
-                        warmup_scale=warmup_scale,
-                    )
-
-                    if valid:
-                        idx_tensor = torch.tensor(
-                            valid,
-                            device=strong.device,
-                            dtype=torch.long,
-                        )
-                        student_outputs = slice_batch_structure(
-                            student_outputs_all,
-                            idx_tensor,
-                            int(strong.shape[0]),
-                        )
-                        feats = [
-                            f.index_select(0, idx_tensor)
-                            for f in feats_all
-                        ]
-                    else:
-                        student_outputs = None
-                        feats = None
-                else:
-                    student_outputs = student(strong_valid)
+                    hook.latest = None
+                    outputs_valid = student(strong_valid)
                     feats = hook.latest
-                    durr_loss = strong_valid.sum() * 0.0
-                    durr_stats = {
-                        "durr_loss": 0.0,
-                        "durr_dir_loss": 0.0,
-                        "durr_rescue_loss": 0.0,
-                        "durr_hall_loss": 0.0,
-                        "durr_direction_pixels_student": 0.0,
-                        "durr_rescue_pixels_student": 0.0,
-                        "durr_hall_pixels_student": 0.0,
-                        "durr_hall_trigger_images": 0.0,
-                    }
-
                     if feats is None:
                         raise RuntimeError(
-                            "MARD feature hook captured no features"
+                            "SegMARD feature hook captured no features"
                         )
 
-                if valid:
-                    # Always construct boxes/classes/semantic targets from HARD geometry.
                     pseudo_batch = build_pseudo_batch(
                         labels_valid,
-                        geometry_masks_valid,
+                        masks_valid,
                         strong_valid.shape,
                     )
-
-                    # BDL and DURR keep BDL's soft instance-mask targets.
-                    if args.dhf_mode in ("bdl", "durr"):
-                        pseudo_batch = inject_soft_instance_masks(
-                            pseudo_batch,
-                            supervision_masks_valid,
-                        )
-
                     det_vec, loss_items = criterion(
-                        student_outputs,
+                        outputs_valid,
                         pseudo_batch,
                     )
                     sfseg_loss = det_vec.sum()
 
-                    if args.mard_mode == "box":
-                        mard_loss, mard_stats = compute_mard_loss(
-                            feats,
-                            labels_valid,
-                            int(strong_valid.shape[2]),
-                            int(strong_valid.shape[3]),
-                            args,
-                        )
-                    else:
-                        mard_loss, mard_stats = compute_segmard_loss(
-                            feats=feats,
-                            pseudo_labels=labels_valid,
-                            pseudo_masks=geometry_masks_valid,
-                            pseudo_reliabilities=(
-                                reliabilities_valid
-                                if args.segmard_reliability_weighting
-                                else None
-                            ),
-                            h_pad=int(strong_valid.shape[2]),
-                            w_pad=int(strong_valid.shape[3]),
-                            args=args,
-                        )
+                    mard_loss, mard_stats = compute_segmard_loss(
+                        feats=feats,
+                        pseudo_labels=labels_valid,
+                        pseudo_masks=masks_valid,
+                        pseudo_reliabilities=None,
+                        h_pad=int(strong_valid.shape[2]),
+                        w_pad=int(strong_valid.shape[3]),
+                        args=args,
+                    )
 
+                    avg_conf = average_confidence(labels_valid)
                     lambda_mard = mard_weight(
                         args,
                         global_step,
                         len(loader),
                         avg_conf,
                     )
-                else:
-                    # DURR-only update on teacher-empty images.
-                    sfseg_loss = durr_loss * 0.0
-                    mard_loss = durr_loss * 0.0
-                    lambda_mard = 0.0
-                    loss_items = torch.zeros(
-                        5,
-                        device=strong.device,
-                        dtype=strong.dtype,
+
+                    dir_loss, dir_stats = (
+                        compute_directional_routing_loss(
+                            outputs_valid,
+                            routes_valid,
+                        )
                     )
-                    mard_stats = {}
+                    rescue_loss, rescue_stats = (
+                        compute_rescue_loss(
+                            outputs_valid,
+                            routes_valid,
+                        )
+                    )
+
+                # ----------------------------------------------------
+                # Teacher-empty images are NOT discarded anymore.
+                # They only receive safe hallucination suppression.
+                # This needs a second Student forward only for the
+                # usually-small empty subset.
+                # ----------------------------------------------------
+                if empty:
+                    strong_empty = strong[empty]
+                    routes_empty = [routes[i] for i in empty]
+
+                    # Do not let this auxiliary forward overwrite the
+                    # already captured SegMARD features used above.
+                    outputs_empty = student(strong_empty)
+
+                    hall_loss, hall_stats = (
+                        compute_safe_hallucination_loss(
+                            outputs_empty,
+                            routes_empty,
+                            student_threshold=(
+                                args.durr_hall_student_thr
+                            ),
+                            area_threshold=(
+                                args.durr_hall_area_thr
+                            ),
+                            area_weight=(
+                                args.durr_hall_area_weight
+                            ),
+                        )
+                    )
+
+                lambda_durr = durr_ramp(
+                    global_step,
+                    len(loader),
+                    args.durr_warmup_epochs,
+                )
 
                 total_loss = (
                     sfseg_loss
                     + lambda_mard * mard_loss
-                    + durr_loss
+                    + lambda_durr
+                    * (
+                        args.durr_lambda_dir * dir_loss
+                        + args.durr_lambda_rescue * rescue_loss
+                        + args.durr_lambda_hall * hall_loss
+                    )
                 )
 
-                # If a DURR-only teacher-empty batch produced no active route,
-                # preserve the original skip behavior rather than taking a
-                # meaningless zero-gradient optimizer step.
-                if (
-                    not valid
-                    and args.dhf_mode == "durr"
-                    and float(durr_loss.detach().abs().item()) <= 1e-12
-                ):
+                has_signal = bool(valid) or (
+                    float(hall_stats.get(
+                        "hall_triggered_images",
+                        0.0,
+                    )) > 0
+                )
+
+                if not has_signal:
                     skipped += 1
                     global_step += 1
                     continue
 
-                if not torch.isfinite(
-                    total_loss
-                ):
-                    raise RuntimeError(
-                        "Non-finite total loss"
-                    )
-
-                optimizer.zero_grad(
-                    set_to_none=True
-                )
+                if not torch.isfinite(total_loss):
+                    raise RuntimeError("Non-finite DURR total loss")
 
                 total_loss.backward()
-
-                grad_norm = (
-                    torch.nn.utils
-                    .clip_grad_norm_(
-                        student.parameters(),
-                        args.grad_clip,
-                    )
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    student.parameters(),
+                    args.grad_clip,
                 )
-
                 if not torch.isfinite(
-                    torch.as_tensor(
-                        grad_norm
-                    )
+                    torch.as_tensor(grad_norm)
                 ):
-                    raise RuntimeError(
-                        "Non-finite gradient"
-                    )
-
+                    raise RuntimeError("Non-finite gradient")
                 optimizer.step()
 
                 global_step += 1
                 successful += 1
 
-                pseudo_n = sum(
-                    x.shape[0]
-                    for x in labels_valid
+                pseudo_n = sum(x.shape[0] for x in labels)
+
+                totals["loss"] += float(total_loss.detach())
+                totals["sfseg"] += float(sfseg_loss.detach())
+                totals["seg"] += float(loss_items[1].detach())
+                totals["semseg"] += float(loss_items[4].detach())
+                totals["mard"] += float(mard_loss.detach())
+                totals["lambda_mard"] += lambda_mard
+                totals["dir"] += float(dir_loss.detach())
+                totals["rescue"] += float(rescue_loss.detach())
+                totals["hall"] += float(hall_loss.detach())
+                totals["lambda_durr"] += lambda_durr
+                totals["pseudo"] += pseudo_n
+                totals["anchors"] += int(ps["anchors"])
+                totals["mask_extras"] += int(
+                    ps["mask_dhf_extras"]
+                )
+                totals["reject_rel"] += int(
+                    ps["rejected_reliability"]
+                )
+                totals["matched_anchors"] += int(
+                    ps["durr_matched_anchors"]
+                )
+                totals["witnesses"] += int(
+                    ps["durr_witnesses"]
+                )
+                totals["rescue_instances"] += int(
+                    ps["durr_rescue_instances"]
+                )
+                totals["teacher_empty_images"] += int(
+                    ps["durr_teacher_empty_images"]
                 )
 
-                totals["loss"] += float(
-                    total_loss.detach()
+                totals["dir_pixels"] += float(
+                    dir_stats.get("dir_pixels", 0.0)
+                )
+                totals["expand_pixels"] += float(
+                    dir_stats.get(
+                        "dir_expand_pixels",
+                        0.0,
+                    )
+                )
+                totals["shrink_pixels"] += float(
+                    dir_stats.get(
+                        "dir_shrink_pixels",
+                        0.0,
+                    )
+                )
+                totals["hall_triggered"] += float(
+                    hall_stats.get(
+                        "hall_triggered_images",
+                        0.0,
+                    )
+                )
+                totals["hall_pixels"] += float(
+                    hall_stats.get("hall_pixels", 0.0)
                 )
 
-                totals["seg_loss"] += float(
-                    loss_items[1]
-                    .detach()
-                )
-
-                totals["semseg_loss"] += float(
-                    loss_items[4]
-                    .detach()
-                )
-
-                totals["mard"] += float(
-                    mard_loss.detach()
-                )
-
-                totals["lambda"] += (
-                    lambda_mard
-                )
-
-                totals["pseudo"] += (
-                    pseudo_n
-                )
-
-                totals["anchors"] += (
-                    ps["anchors"]
-                )
-
-                totals["box_extras"] += (
-                    ps[
-                        "box_dhf_extras"
-                    ]
-                )
-
-                totals["mask_extras"] += (
-                    ps[
-                        "mask_dhf_extras"
-                    ]
-                )
-
-                totals["rejected_rel"] += (
-                    ps[
-                        "rejected_reliability"
-                    ]
-                )
-
-                if args.dhf_mode == "cc":
-                    totals["consensus_anchors"] += int(
-                        ps.get("consensus_anchors", 0)
-                    )
-                    totals["consensus_witnesses"] += int(
-                        ps.get("consensus_witnesses", 0)
-                    )
-                    totals["consensus_fallbacks"] += int(
-                        ps.get("consensus_fallbacks", 0)
-                    )
-                    shift_count = int(
-                        ps.get("consensus_abs_shift_count", 0)
-                    )
-                    totals["consensus_shift_sum"] += float(
-                        ps.get("consensus_abs_shift_sum", 0.0)
-                    )
-                    totals["consensus_shift_count"] += shift_count
-                    totals["consensus_mask_iou_sum"] += float(
-                        ps.get("consensus_mask_iou_sum", 0.0)
-                    )
-                    totals["consensus_mask_iou_count"] += int(
-                        ps.get("consensus_mask_iou_count", 0)
-                    )
-
-                if args.dhf_mode == "bdl":
-                    for key in (
-                        "bdl_anchors",
-                        "bdl_witnesses",
-                        "bdl_boundary_fallbacks",
-                        "bdl_boundary_disagreement_count",
-                        "bdl_interior_disagreement_count",
-                        "bdl_soft_target_shift_count",
-                        "bdl_boundary_pixels",
-                        "bdl_interior_pixels",
-                    ):
-                        totals[key] += int(ps.get(key, 0))
-                    for key in (
-                        "bdl_boundary_disagreement_sum",
-                        "bdl_interior_disagreement_sum",
-                        "bdl_soft_target_shift_sum",
-                    ):
-                        totals[key] += float(ps.get(key, 0.0))
-
-                    append_jsonl(
-                        bdl_history,
-                        {
-                            "epoch": epoch + 1,
-                            "batch": batch_i,
-                            "pseudo": pseudo_n,
-                            "anchors": int(ps.get("anchors", 0)),
-                            "bdl_anchors": int(ps.get("bdl_anchors", 0)),
-                            "bdl_witnesses": int(ps.get("bdl_witnesses", 0)),
-                            "boundary_disagreement": float(ps.get("bdl_boundary_disagreement_mean", 0.0)),
-                            "interior_disagreement": float(ps.get("bdl_interior_disagreement_mean", 0.0)),
-                            "boundary_interior_ratio": float(ps.get("bdl_boundary_interior_ratio", 0.0)),
-                            "soft_target_shift": float(ps.get("bdl_soft_target_shift_mean", 0.0)),
-                            "boundary_pixels": int(ps.get("bdl_boundary_pixels", 0)),
-                            "interior_pixels": int(ps.get("bdl_interior_pixels", 0)),
-                            "boundary_fallbacks": int(ps.get("bdl_boundary_fallbacks", 0)),
-                        },
-                    )
-
-                if args.dhf_mode == "durr":
-                    totals["durr_loss"] += float(
-                        durr_stats.get("durr_loss", 0.0)
-                    )
-                    totals["durr_dir_loss"] += float(
-                        durr_stats.get("durr_dir_loss", 0.0)
-                    )
-                    totals["durr_rescue_loss"] += float(
-                        durr_stats.get("durr_rescue_loss", 0.0)
-                    )
-                    totals["durr_hall_loss"] += float(
-                        durr_stats.get("durr_hall_loss", 0.0)
-                    )
-                    totals["durr_direction_pixels"] += float(
-                        durr_stats.get("durr_direction_pixels_student", 0.0)
-                    )
-                    totals["durr_rescue_pixels"] += float(
-                        durr_stats.get("durr_rescue_pixels_student", 0.0)
-                    )
-                    totals["durr_hall_pixels"] += float(
-                        durr_stats.get("durr_hall_pixels_student", 0.0)
-                    )
-                    totals["durr_hall_trigger_images"] += float(
-                        durr_stats.get("durr_hall_trigger_images", 0.0)
-                    )
-                    totals["durr_teacher_empty_images"] += int(
-                        ps.get("durr_teacher_empty_images", 0)
-                    )
-                    totals["durr_rescue_images"] += int(
-                        ps.get("durr_rescue_images", 0)
-                    )
-                    totals["durr_rescue_instances"] += int(
-                        ps.get("durr_rescue_instances", 0)
-                    )
-
-                    append_jsonl(
-                        durr_history,
-                        {
-                            "epoch": epoch + 1,
-                            "batch": batch_i,
-                            "pseudo": pseudo_n,
-                            "anchors": int(ps.get("anchors", 0)),
-                            "teacher_empty_images": int(
-                                ps.get("durr_teacher_empty_images", 0)
-                            ),
-                            "rescue_images": int(
-                                ps.get("durr_rescue_images", 0)
-                            ),
-                            "rescue_instances": int(
-                                ps.get("durr_rescue_instances", 0)
-                            ),
-                            "signed_abs_mean": float(
-                                ps.get("durr_signed_abs_mean", 0.0)
-                            ),
-                            "direction_pixels": int(
-                                ps.get("durr_direction_pixels", 0)
-                            ),
-                            "loss": float(
-                                durr_stats.get("durr_loss", 0.0)
-                            ),
-                            "dir_loss": float(
-                                durr_stats.get("durr_dir_loss", 0.0)
-                            ),
-                            "rescue_loss": float(
-                                durr_stats.get("durr_rescue_loss", 0.0)
-                            ),
-                            "hall_loss": float(
-                                durr_stats.get("durr_hall_loss", 0.0)
-                            ),
-                            "hall_trigger_images": int(
-                                durr_stats.get("durr_hall_trigger_images", 0.0)
-                            ),
-                            "warmup": float(
-                                durr_stats.get("durr_warmup_scale", 0.0)
-                            ),
-                        },
-                    )
-
-                if rel_cat.numel():
-                    totals["rel_sum"] += float(rel_cat.sum().item())
-                    totals["rel_count"] += int(rel_cat.numel())
-                    totals["rel_min"] = min(
-                        totals["rel_min"],
-                        batch_rel_min,
-                    )
-                    totals["rel_max"] = max(
-                        totals["rel_max"],
-                        batch_rel_max,
-                    )
-
-                if args.mard_mode == "mask":
-                    for key in (
-                        "fg_tokens",
-                        "hard_bg_tokens",
-                        "easy_bg_tokens",
-                        "core_fallbacks",
-                    ):
-                        totals[key] += float(
-                            mard_stats.get(
-                                key,
-                                0.0,
-                            )
-                        )
-
-                    totals["token_weight_sum"] += float(
-                        mard_stats.get(
-                            "token_weight_mean",
-                            1.0,
-                        )
+                for key in (
+                    "fg_tokens",
+                    "hard_bg_tokens",
+                    "easy_bg_tokens",
+                ):
+                    totals[key] += float(
+                        mard_stats.get(key, 0.0)
                     )
 
                 if (
                     batch_i == 1
-                    or batch_i
-                    % args.print_freq == 0
+                    or batch_i % args.print_freq == 0
                     or batch_i == len(loader)
                 ):
                     print(
@@ -2200,97 +1525,48 @@ def main():
                         f"batch={batch_i:03d}/{len(loader):03d} "
                         f"pseudo={pseudo_n} "
                         f"loss={float(total_loss.detach()):.4f} "
+                        f"sfseg={float(sfseg_loss.detach()):.4f} "
                         f"seg={float(loss_items[1]):.4f} "
-                        f"semseg={float(loss_items[4]):.4f} "
                         f"mard={float(mard_loss.detach()):.4f} "
-                        f"lambda={lambda_mard:.6f} "
-                        f"box_extra={ps['box_dhf_extras']} "
-                        f"mask_extra={ps['mask_dhf_extras']} "
-                        + (
-                            (
-                                f"CC={int(ps.get('consensus_anchors', 0))}/"
-                                f"{int(ps.get('consensus_witnesses', 0))} "
-                                f"cc_shift="
-                                f"{float(ps.get('consensus_abs_shift_mean', 0.0)):.5f} "
-                                f"cc_iou="
-                                f"{float(ps.get('consensus_mask_iou_mean', 0.0)):.5f} "
-                            )
-                            if args.dhf_mode == "cc"
-                            else ""
-                        )
-                        + (
-                            (
-                                f"BDL={int(ps.get('bdl_anchors', 0))}/"
-                                f"{int(ps.get('bdl_witnesses', 0))} "
-                                f"Dbd/Din="
-                                f"{float(ps.get('bdl_boundary_disagreement_mean', 0.0)):.5f}/"
-                                f"{float(ps.get('bdl_interior_disagreement_mean', 0.0)):.5f} "
-                                f"ratio={float(ps.get('bdl_boundary_interior_ratio', 0.0)):.2f} "
-                                f"soft_shift={float(ps.get('bdl_soft_target_shift_mean', 0.0)):.5f} "
-                            )
-                            if args.dhf_mode == "bdl"
-                            else ""
-                        )
-                        + (
-                            (
-                                f"DURR="
-                                f"{float(durr_stats.get('durr_loss', 0.0)):.4f} "
-                                f"(dir={float(durr_stats.get('durr_dir_loss', 0.0)):.4f},"
-                                f"res={float(durr_stats.get('durr_rescue_loss', 0.0)):.4f},"
-                                f"hall={float(durr_stats.get('durr_hall_loss', 0.0)):.4f}) "
-                                f"route_px={int(durr_stats.get('durr_direction_pixels_student', 0))} "
-                                f"rescue_px={int(durr_stats.get('durr_rescue_pixels_student', 0))} "
-                                f"hall_px={int(durr_stats.get('durr_hall_pixels_student', 0))} "
-                            )
-                            if args.dhf_mode == "durr"
-                            else ""
-                        )
-                        + (
-                            (
-                                f"FG/HBG/EBG="
-                                f"{int(mard_stats.get('fg_tokens', 0))}/"
-                                f"{int(mard_stats.get('hard_bg_tokens', 0))}/"
-                                f"{int(mard_stats.get('easy_bg_tokens', 0))} "
-                                f"fallback="
-                                f"{int(mard_stats.get('core_fallbacks', 0))} "
-                                f"rel={batch_rel_mean:.3f}/"
-                                f"{batch_rel_min:.3f}/"
-                                f"{batch_rel_max:.3f} "
-                                f"wmean="
-                                f"{float(mard_stats.get('token_weight_mean', 1.0)):.3f} "
-                            )
-                            if args.mard_mode == "mask"
-                            else ""
-                        )
-                        + f"grad_preclip={float(grad_norm):.2f}",
+                        f"λM={lambda_mard:.4f} "
+                        f"DURR(dir/res/hall)="
+                        f"{float(dir_loss.detach()):.4f}/"
+                        f"{float(rescue_loss.detach()):.4f}/"
+                        f"{float(hall_loss.detach()):.4f} "
+                        f"λD={lambda_durr:.3f} "
+                        f"route={int(dir_stats.get('dir_pixels', 0))} "
+                        f"E/S="
+                        f"{int(dir_stats.get('dir_expand_pixels', 0))}/"
+                        f"{int(dir_stats.get('dir_shrink_pixels', 0))} "
+                        f"rescue={int(ps['durr_rescue_instances'])} "
+                        f"empty={int(ps['durr_teacher_empty_images'])} "
+                        f"hall={int(hall_stats.get('hall_triggered_images', 0))}/"
+                        f"{int(hall_stats.get('hall_pixels', 0))} "
+                        f"FG/HBG/EBG="
+                        f"{int(mard_stats.get('fg_tokens', 0))}/"
+                        f"{int(mard_stats.get('hard_bg_tokens', 0))}/"
+                        f"{int(mard_stats.get('easy_bg_tokens', 0))} "
+                        f"grad={float(grad_norm):.2f}",
                         flush=True,
                     )
 
             if successful == 0:
                 raise RuntimeError(
-                    "Epoch had no valid batches"
+                    "Epoch had no optimization batches"
                 )
 
             scheduler.step()
-
-            if hasattr(
-                criterion,
-                "update",
-            ):
+            if hasattr(criterion, "update"):
                 criterion.update()
 
-            # Epoch-level EMA only.
+            # Epoch-level Mean Teacher EMA.
             update_teacher_ema(
                 teacher,
                 student,
                 args.ema,
             )
 
-            denom = max(
-                successful,
-                1,
-            )
-
+            denom = max(successful, 1)
             print()
             print(
                 f"[Epoch {epoch+1:02d}] DONE "
@@ -2299,113 +1575,60 @@ def main():
                 f"skipped={skipped} "
                 f"pseudo={totals['pseudo']} "
                 f"anchors={totals['anchors']} "
-                f"box_extra={totals['box_extras']} "
                 f"mask_extra={totals['mask_extras']} "
-                f"reject_rel={totals['rejected_rel']} "
-                + (
-                    (
-                        f"CC={totals['consensus_anchors']}/"
-                        f"{totals['consensus_witnesses']} "
-                        f"cc_fallback={totals['consensus_fallbacks']} "
-                        f"cc_shift="
-                        f"{totals['consensus_shift_sum']/max(totals['consensus_shift_count'], 1):.5f} "
-                        f"cc_iou="
-                        f"{totals['consensus_mask_iou_sum']/max(totals['consensus_mask_iou_count'], 1):.5f} "
-                    )
-                    if args.dhf_mode == "cc"
-                    else ""
-                )
-                + (
-                    (
-                        f"BDL={totals['bdl_anchors']}/{totals['bdl_witnesses']} "
-                        f"bdl_fallback={totals['bdl_boundary_fallbacks']} "
-                        f"Dbd/Din="
-                        f"{totals['bdl_boundary_disagreement_sum']/max(totals['bdl_boundary_disagreement_count'], 1):.5f}/"
-                        f"{totals['bdl_interior_disagreement_sum']/max(totals['bdl_interior_disagreement_count'], 1):.5f} "
-                        f"ratio="
-                        f"{(totals['bdl_boundary_disagreement_sum']/max(totals['bdl_boundary_disagreement_count'], 1))/max(totals['bdl_interior_disagreement_sum']/max(totals['bdl_interior_disagreement_count'], 1), 1e-8):.2f} "
-                        f"soft_shift="
-                        f"{totals['bdl_soft_target_shift_sum']/max(totals['bdl_soft_target_shift_count'], 1):.5f} "
-                    )
-                    if args.dhf_mode == "bdl"
-                    else ""
-                )
-                + (
-                    (
-                        f"DURR={totals['durr_loss']/denom:.4f} "
-                        f"(dir={totals['durr_dir_loss']/denom:.4f},"
-                        f"res={totals['durr_rescue_loss']/denom:.4f},"
-                        f"hall={totals['durr_hall_loss']/denom:.4f}) "
-                        f"empty={totals['durr_teacher_empty_images']} "
-                        f"rescue={totals['durr_rescue_images']}/"
-                        f"{totals['durr_rescue_instances']} "
-                        f"hall_trigger={int(totals['durr_hall_trigger_images'])} "
-                    )
-                    if args.dhf_mode == "durr"
-                    else ""
-                )
-                + f"loss={totals['loss']/denom:.4f} "
-                f"seg={totals['seg_loss']/denom:.4f} "
-                f"semseg={totals['semseg_loss']/denom:.4f} "
+                f"reject_rel={totals['reject_rel']} "
+                f"DURRmatch={totals['matched_anchors']}/"
+                f"{totals['witnesses']} "
+                f"rescue={totals['rescue_instances']} "
+                f"teacher_empty={totals['teacher_empty_images']} "
+                f"hall={int(totals['hall_triggered'])}/"
+                f"{int(totals['hall_pixels'])} "
+                f"loss={totals['loss']/denom:.4f} "
+                f"sfseg={totals['sfseg']/denom:.4f} "
                 f"mard={totals['mard']/denom:.4f} "
-                f"lambda_avg={totals['lambda']/denom:.6f}"
-                + (
-                    (
-                        f" FG/HBG/EBG="
-                        f"{totals['fg_tokens']/denom:.1f}/"
-                        f"{totals['hard_bg_tokens']/denom:.1f}/"
-                        f"{totals['easy_bg_tokens']/denom:.1f} "
-                        f"rel="
-                        f"{totals['rel_sum']/max(totals['rel_count'], 1):.3f}/"
-                        f"{totals['rel_min']:.3f}/"
-                        f"{totals['rel_max']:.3f} "
-                        f"wmean="
-                        f"{totals['token_weight_sum']/denom:.3f}"
-                    )
-                    if args.mard_mode == "mask"
-                    else ""
-                ),
+                f"dir={totals['dir']/denom:.4f} "
+                f"res={totals['rescue']/denom:.4f} "
+                f"hallL={totals['hall']/denom:.4f} "
+                f"route E/S="
+                f"{int(totals['expand_pixels'])}/"
+                f"{int(totals['shrink_pixels'])}",
                 flush=True,
             )
 
-            save_this_epoch = (
+            save_now = (
                 (epoch + 1) % args.save_interval == 0
                 or (epoch + 1) == args.epochs
             )
-
-            if save_this_epoch:
-                # Detach hook before serialization.
+            if save_now:
                 hook.close()
-
                 student.eval()
+                teacher.eval()
 
-                student_wrapper.model = student
-
-                ckpt = (
-                    checkpoint_dir
-                    / (
-                        f"dense_sfseg_"
-                        f"epoch_{epoch+1}.pt"
-                    )
+                student_ckpt = (
+                    ckpt_dir
+                    / f"durr_student_epoch_{epoch+1}.pt"
+                )
+                teacher_ckpt = (
+                    ckpt_dir
+                    / f"durr_teacher_ema_epoch_{epoch+1}.pt"
                 )
 
-                student_wrapper.save(
-                    str(ckpt)
+                save_model(
+                    student_wrapper,
+                    student,
+                    student_ckpt,
                 )
-                final_ckpt = ckpt
-
-                print(
-                    "[SAVE]",
-                    ckpt,
-                    flush=True,
+                save_model(
+                    teacher_wrapper,
+                    teacher,
+                    teacher_ckpt,
                 )
+                print("[SAVE Student]", student_ckpt)
+                print("[SAVE Teacher]", teacher_ckpt)
 
                 if epoch + 1 < args.epochs:
                     student.train()
-
-                    hook = SegmentInputFeatureHook(
-                        student
-                    )
+                    hook = SegmentInputFeatureHook(student)
 
     finally:
         if (
@@ -2415,241 +1638,114 @@ def main():
             hook.close()
 
     metadata = {
+        "method": "MedRT-SFSeg + DURR-v1 + SegMARD-v2",
         "source_free": True,
         "target_labels_used": False,
         "target_gt_masks_used": False,
-
-        "initial_weights":
-            str(
-                Path(
-                    args.weights
-                ).resolve()
-            ),
-
+        "initial_weights": str(
+            Path(args.weights).resolve()
+        ),
         "epochs": args.epochs,
-
-        "dhf_mode": args.dhf_mode,
-
-        "cc_dhf": {
-            "enabled": args.dhf_mode == "cc",
-            "tau_match": args.cc_tau_match,
-            "max_consensus_witnesses": args.cc_max_witnesses,
-            "consensus_fusion": (
-                "branch-balanced reliability-weighted O2O/O2M soft-mask consensus"
-            ),
-            "coverage_definition": (
-                "same-class best O2O box IoU <= tau_no, then original Mask-DHF NMS+reliability"
-            ),
-            "o2o_box_policy": "unchanged",
-            "o2o_reliability_policy": "unchanged; consensus refines masks only",
-        },
-
-        "boundary_disagreement_learning": {
-            "enabled": args.dhf_mode == "bdl",
-            "tau_match": args.bdl_tau_match,
-            "max_witnesses": args.bdl_max_witnesses,
-            "boundary_kernel": args.bdl_boundary_kernel,
-            "uncertainty": (
-                "reliability-weighted mean absolute O2O/O2M soft-mask disagreement"
-            ),
-            "pseudo_target_rule": (
-                "keep O2O hard geometry; soften only the inner positive boundary toward "
-                "O2O soft probability by pixel-wise disagreement"
-            ),
-            "coverage": (
-                "unmatched novel O2M follows original Mask-DHF NMS + reliability gate"
-            ),
-            "target_gt_used": False,
-            "debug_visualization": args.bdl_debug_vis,
-        },
-
         "durr": {
-            "enabled": args.dhf_mode == "durr",
             "name": "Dual-head Uncertainty Reliability Routing",
-            "signed_direction": "r_m * P_o2m - r_o * P_o2o",
+            "signed_boundary_routing": True,
+            "reliable_o2m_rescue": True,
+            "safe_hallucination_suppression": True,
+            "tau_match": args.durr_tau_match,
+            "max_witnesses": args.durr_max_witnesses,
             "boundary_kernel": args.durr_boundary_kernel,
-            "direction_min_abs": args.durr_direction_min_abs,
-            "direction_margin": args.durr_direction_margin,
+            "route_gain": args.durr_route_gain,
+            "min_disagreement":
+                args.durr_min_disagreement,
             "rescue_conf": args.durr_rescue_conf,
-            "rescue_stability": args.durr_rescue_stability,
-            "safe_bg_teacher_prob": args.durr_safe_bg_teacher_prob,
-            "hall_student_prob": args.durr_hall_student_prob,
-            "hall_area_threshold": args.durr_hall_area_thr,
-            "lambda_direction": args.durr_lambda_direction,
-            "lambda_rescue": args.durr_lambda_rescue,
-            "lambda_hallucination": args.durr_lambda_hall,
-            "warmup_epochs": args.durr_warmup_epochs,
-            "target_gt_used_during_adaptation": False,
+            "rescue_stability":
+                args.durr_rescue_stability,
+            "rescue_consensus_iou":
+                args.durr_rescue_consensus_iou,
+            "rescue_min_support":
+                args.durr_rescue_min_support,
+            "evidence_conf":
+                args.durr_evidence_conf,
+            "safe_bg_teacher_prob":
+                args.durr_safe_bg_teacher_prob,
+            "hall_student_threshold":
+                args.durr_hall_student_thr,
+            "hall_area_threshold":
+                args.durr_hall_area_thr,
+            "lambda_dir": args.durr_lambda_dir,
+            "lambda_rescue":
+                args.durr_lambda_rescue,
+            "lambda_hall":
+                args.durr_lambda_hall,
+            "warmup_epochs":
+                args.durr_warmup_epochs,
         },
-
         "mask_dhf": {
-            "tau_o2o":
-                args.tau_o2o,
-            "tau_o2m":
-                args.tau_o2m,
-            "tau_no":
-                args.tau_no,
-            "tau_dup":
-                args.tau_dup,
-            "stability_low":
-                args.stability_low,
-            "stability_high":
-                args.stability_high,
+            "tau_o2o": args.tau_o2o,
+            "tau_o2m": args.tau_o2m,
+            "tau_no": args.tau_no,
+            "tau_dup": args.tau_dup,
+            "stability_low": args.stability_low,
+            "stability_high": args.stability_high,
             "reliability_threshold":
                 args.mask_rel_thr,
-            "threshold_source":
-                "Q25 of initial AdaBN Teacher "
-                "Box-DHF extras; label-free",
+            "reliability_threshold_source":
+                "Q25 of initial AdaBN Teacher target O2M extras; label-free",
         },
-
-        "mard": {
-            "lambda0":
-                args.mard_lambda0,
-            "lambda_max":
-                args.mard_lambda_max,
-            "warmup_epochs":
-                args.mard_warmup_epochs,
-            "gamma":
-                args.mard_gamma,
-            "alpha":
-                args.mard_alpha,
-            "beta":
-                args.mard_beta,
-            "fg_points":
-                args.mard_fg_points,
-            "bg_points":
-                args.mard_bg_points,
-            "eta":
-                args.mard_eta,
-            "mode":
-                args.mard_mode,
-            "foreground_definition":
-                (
-                    "pseudo segmentation mask"
-                    if args.mard_mode == "mask"
-                    else "pseudo bounding box"
-                ),
-            "segmard_erode_kernel":
-                args.segmard_erode_kernel,
-            "segmard_dilate_kernel":
-                args.segmard_dilate_kernel,
-            "segmard_hard_bg_ratio":
+        "segmard": {
+            "hard_bg_ratio":
                 args.segmard_hard_bg_ratio,
-            "segmard_reliability_weighting":
+            "erode_kernel":
+                args.segmard_erode_kernel,
+            "dilate_kernel":
+                args.segmard_dilate_kernel,
+            "reliability_weighting":
                 args.segmard_reliability_weighting,
-            "segmard_reliability_definition":
-                (
-                    "sqrt(box_confidence * threshold_stability)"
-                    if args.segmard_reliability_weighting
-                    else "disabled"
-                ),
-            "segmard_reliability_token_policy":
-                (
-                    "FG=r_i; HBG=max r_i of covering hard regions; EBG=1"
-                    if args.segmard_reliability_weighting
-                    else "uniform"
-                ),
         },
-
-        "ema_momentum":
-            args.ema,
-
-        "ema_frequency":
-            "epoch",
-    }
-
-    out_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    (
-        out_dir
-        / "stage2_metadata.json"
-    ).write_text(
-        json.dumps(
-            metadata,
-            indent=2,
+        "ema_momentum": args.ema,
+        "ema_frequency": "epoch",
+        "deployment": (
+            "adapted Student O2O inference only; "
+            "DURR and SegMARD are training-only"
         ),
+        "checkpoint_policy": (
+            "both Student and EMA Teacher are saved at every save interval"
+        ),
+        "post_training_analysis": {
+            "automatic": True,
+            "two_tables": True,
+            "teacher_and_student_masks_saved": True,
+            "heal_asd_reference": "HEAL BMVC 2025 -> Taha & Hanbury 2015",
+            "spacing_mm_y": args.analysis_spacing_mm_y,
+            "spacing_mm_x": args.analysis_spacing_mm_x,
+            "unit_note": (
+                "CVC/Kvasir provide no calibrated physical spacing; default 1.0/1.0 "
+                "is unit spacing unless true spacing is explicitly supplied."
+            ),
+        },
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "stage2_metadata.json").write_text(
+        json.dumps(metadata, indent=2),
         encoding="utf-8",
     )
 
-    # ---------------------------------------------------------------
-    # POST-TRAINING ONLY Teacher-vs-Student trace.
-    # This is intentionally after final checkpoint serialization and metadata.
-    # Target GT never participates in adaptation or model selection.
-    # ---------------------------------------------------------------
-    if args.post_trace_gt_masks:
-        if final_ckpt is None:
-            raise RuntimeError(
-                "Post-trace requested but no final Student checkpoint was saved"
-            )
-
-        trace_script = SCRIPT_DIR / "trace_teacher_student_masks.py"
-        if not trace_script.exists():
-            raise FileNotFoundError(
-                f"Automatic post-trace requires {trace_script}"
-            )
-
-        trace_out = out_dir / "final_teacher_student_trace"
-        cmd = [
-            sys.executable,
-            str(trace_script),
-            "--teacher",
-            str(Path(args.weights).resolve()),
-            "--student",
-            str(Path(final_ckpt).resolve()),
-            "--images",
-            str(Path(args.target_images).resolve()),
-            "--gt-masks",
-            str(Path(args.post_trace_gt_masks).resolve()),
-            "--out-dir",
-            str(trace_out.resolve()),
-            "--imgsz",
-            str(args.imgsz),
-            "--device",
-            str(args.device),
-            "--student-conf",
-            "0.25",
-            "--tau-o2o",
-            str(args.tau_o2o),
-            "--tau-o2m",
-            str(args.tau_o2m),
-            "--tau-no",
-            str(args.tau_no),
-            "--tau-dup",
-            str(args.tau_dup),
-            "--bdl-tau-match",
-            str(args.bdl_tau_match),
-            "--bdl-max-witnesses",
-            str(args.bdl_max_witnesses),
-            "--mask-thr",
-            str(args.mask_thr),
-            "--stability-low",
-            str(args.stability_low),
-            "--stability-high",
-            str(args.stability_high),
-            "--mask-rel-thr",
-            str(args.mask_rel_thr),
-            "--min-mask-pixels",
-            str(args.min_mask_pixels),
-            "--bdl-boundary-kernel",
-            str(args.bdl_boundary_kernel),
-        ]
-        if args.post_trace_max_images > 0:
-            cmd += [
-                "--max-images",
-                str(args.post_trace_max_images),
-            ]
-
-        print()
-        print("[POST-TRACE] Training is frozen. Running evaluation-only Teacher/Student visualization...")
-        subprocess.run(cmd, check=True)
-        print("[POST-TRACE] Saved:", trace_out)
+    # Automatically generate Teacher+Student trace; no extra script is needed.
+    # GT, when supplied, is first touched here after all training is over.
+    run_automatic_post_training_trace(
+        args=args,
+        device=device,
+        images=images,
+        final_teacher=teacher,
+        final_student_wrapper=student_wrapper,
+        out_dir=out_dir,
+    )
 
     print()
+    print("[PASS] DURR Stage-2 completed")
     print(
-        "[PASS] Dense SFSeg run completed"
+        "[NOTE] Both final Student and final EMA Teacher checkpoints "
+        "were saved automatically."
     )
 
 

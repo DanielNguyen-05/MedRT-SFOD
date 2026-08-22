@@ -213,7 +213,7 @@ mkdir -p runs/seg/source logs/seg/source
 nohup env PYTHONPATH="$PWD" \
 python scripts/YOLO26/medseg/train_source_seg.py \
   --weights yolo26s-seg.pt \
-  --data dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml \
+  --data dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
   --epochs 100 \
   --imgsz 640 \
   --batch 8 \
@@ -221,8 +221,8 @@ python scripts/YOLO26/medseg/train_source_seg.py \
   --device 0 \
   --seed 29 \
   --project runs/seg/source \
-  --name kvasir_yolo26s_seg \
-> logs/seg/source/kvasir_yolo26s_seg.log 2>&1 &
+  --name cvc_yolo26s_seg \
+> logs/seg/source/cvc_yolo26s_seg.log 2>&1 &
 
 echo "PID=$!"
 ```
@@ -247,16 +247,16 @@ runs/seg/source/kvasir_yolo26s_seg/weights/best.pt
 mkdir -p runs/seg/benchmarks logs/seg/benchmarks
 
 python scripts/YOLO26/medseg/eval_source_seg.py \
-  --model runs/seg/source/kvasir_yolo26s_seg/weights/best.pt \
-  --data dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml \
-  --images dataset/Kvasir-SEG-YOLO26/images/val \
-  --gt-masks dataset/Kvasir-SEG-YOLO26/gt_masks/val \
+  --model runs/seg/source/cvc_yolo26s_seg/weights/best.pt \
+  --data dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
+  --images dataset/CVC-ClinicDB-YOLO26/images/val \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/val \
   --imgsz 640 \
   --batch 8 \
   --device 0 \
   --conf 0.25 \
-  --out runs/seg/benchmarks/kvasir_yolo26s_seg_source_metrics.json \
-2>&1 | tee logs/seg/benchmarks/kvasir_yolo26s_seg_source_eval.log
+  --out runs/seg/benchmarks/cvc_yolo26s_seg_source_metrics.json \
+2>&1 | tee logs/seg/benchmarks/cvc_yolo26s_seg_source_eval.log
 ```
 
 ---
@@ -289,6 +289,27 @@ Canonical source checkpoint:
 runs/seg/source/frozen/kvasir_yolo26s_seg_source_best.pt
 ```
 
+If CVC -> Kvasir:
+```bash
+mkdir -p runs/seg/source/frozen
+
+cp \
+  runs/seg/source/cvc_yolo26s_seg/weights/best.pt \
+  runs/seg/source/frozen/cvc_yolo26s_seg_source_best.pt
+
+cp \
+  dataset/CVC-ClinicDB-YOLO26/split_train.txt \
+  runs/seg/source/frozen/
+
+cp \
+  dataset/CVC-ClinicDB-YOLO26/split_val.txt \
+  runs/seg/source/frozen/
+
+sha256sum \
+  runs/seg/source/frozen/cvc_yolo26s_seg_source_best.pt \
+  | tee runs/seg/source/frozen/cvc_yolo26s_seg_source_best.sha256
+```
+
 ---
 
 # 8. Prepare CVC-ClinicDB target
@@ -300,7 +321,6 @@ python scripts/YOLO26/medseg/prepare_cvc_clinicdb.py \
   --min-contour-area 15 \
   --overwrite
 ```
-
 Check:
 
 ```bash
@@ -315,6 +335,19 @@ Expected:
 images   = 612
 labels   = 612
 gt_masks = 612
+```
+
+If we train CVC-ClinicDB -> Kvasir. We run this and arrange the folder later.
+```bash
+python scripts/YOLO26/medseg/prepare_cvc_to_kvasir_reverse.py   
+  --cvc-raw dataset/CVC-ClinicDB/PNG   
+  --kvasir-raw dataset/Kvasir-SEG   
+  --cvc-source-out dataset/CVC-ClinicDB-YOLO26-SOURCE   
+  --kvasir-target-out dataset/Kvasir-SEG-YOLO26-TARGET   
+  --val-fraction 0.20   
+  --seed 29   
+  --min-contour-area 15   
+  --overwrite
 ```
 
 ---
@@ -356,6 +389,24 @@ python scripts/YOLO26/medseg/stage1_adabn_seg.py \
 > logs/seg/stage1/cvc_adabn.log 2>&1 &
 
 echo "PID=$!"
+```
+
+If CVC -> Kvasir
+```bash
+mkdir -p runs/seg/stage1/kvasir_adabn logs/seg/stage1
+
+nohup env PYTHONPATH="$PWD" \
+python scripts/YOLO26/medseg/stage1_adabn_seg.py \
+  --weights runs/seg/source/frozen/cvc_yolo26s_seg_source_best.pt \
+  --target-images dataset/Kvasir-SEG-YOLO26/images/target \
+  --out-dir runs/seg/stage1/kvasir_adabn \
+  --imgsz 640 \
+  --batch 8 \
+  --workers 4 \
+  --epochs 2 \
+  --device 0 \
+  --seed 29 \
+> logs/seg/stage1/kvasir_adabn.log 2>&1 &
 ```
 
 Monitor:
@@ -404,6 +455,19 @@ sha256sum \
   | tee runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.sha256
 ```
 
+If CVC -> Kvasir:
+```bash
+mkdir -p runs/seg/stage1/frozen
+
+cp \
+  runs/seg/stage1/kvasir_adabn/yolo26s_seg_kvasir_adabn.pt \
+  runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.pt
+
+sha256sum \
+  runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.pt \
+  | tee runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.sha256
+```
+
 Canonical Stage-2 initialization:
 
 ```text
@@ -425,6 +489,20 @@ python scripts/YOLO26/medseg/audit_stage2_seg.py \
   --workers 4 \
   --device 0 \
 2>&1 | tee logs/seg/dense_sfseg/stage2_seg_pseudolabel_audit.log
+```
+
+If Kvasir -> CVC
+```bash
+mkdir -p runs/seg/dense_sfseg logs/seg/dense_sfseg
+
+python scripts/YOLO26/medseg/audit_stage2_seg.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt \
+  --target-images dataset/Kvasir-SEG-YOLO26/images/target \
+  --imgsz 640 \
+  --batch 8 \
+  --workers 4 \
+  --device 0 \
+2>&1 | tee logs/seg/dense_sfseg/stage2_seg_pseudolabel_audit_cvc2kvasir.log
 ```
 
 ---
@@ -450,6 +528,28 @@ python scripts/YOLO26/medseg/audit_mask_dhf_seg.py \
   --seed 29 \
   --out runs/seg/dense_sfseg/mask_dhf_audit.json \
 2>&1 | tee logs/seg/dense_sfseg/mask_dhf_audit.log
+```
+
+CVC -> Kvasir:
+```bash
+python scripts/YOLO26/medseg/audit_mask_dhf_seg.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.pt \
+  --target-images dataset/Kvasir-SEG-YOLO26/images/target \
+  --imgsz 640 \
+  --batch 8 \
+  --workers 4 \
+  --tau-o2o 0.5 \
+  --tau-o2m 0.5 \
+  --tau-no 0.2 \
+  --tau-dup 0.7 \
+  --mask-thr 0.5 \
+  --mask-rel-thr 0.65 \
+  --mask-no 0.20 \
+  --min-mask-pixels 16 \
+  --device 0 \
+  --seed 29 \
+  --out runs/seg/dense_sfseg/mask_dhf_audit.json \
+2>&1 | tee logs/seg/dense_sfseg/mask_dhf_audit_cvc2kvasir.log
 ```
 
 ---
@@ -482,9 +582,32 @@ Canonical Mask-DHF reliability threshold:
 0.744898
 ```
 
+CVC -> Kvasir:
+```bash
+python scripts/YOLO26/medseg/audit_mask_stability_extras.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.pt \
+  --target-images dataset/Kvasir-SEG-YOLO26/images/target \
+  --imgsz 640 \
+  --batch 8 \
+  --workers 4 \
+  --device 0 \
+  --tau-o2o 0.5 \
+  --tau-o2m 0.5 \
+  --tau-no 0.2 \
+  --tau-dup 0.7 \
+  --mask-thr 0.5 \
+  --stability-low 0.40 \
+  --stability-high 0.60 \
+  --min-mask-pixels 16 \
+  --out runs/seg/dense_sfseg/mask_stability_extras_audit.json \
+2>&1 | tee logs/seg/dense_sfseg/mask_stability_extras_audit_cvc2kvasir.log
+```
+
 ---
 
 # 16. Dense MedRT-SFSeg — 60 epochs
+
+## 16a. Training
 
 ```bash
 mkdir -p \
@@ -544,9 +667,7 @@ Final Dense checkpoint:
 runs/seg/dense_sfseg/cvc_dense_60ep/checkpoints/dense_sfseg_epoch_60.pt
 ```
 
----
-
-# 17. Evaluate Dense MedRT-SFSeg
+## 16b. Evaluate Dense MedRT-SFSeg
 
 ```bash
 nohup env PYTHONPATH="$PWD" \
@@ -573,78 +694,24 @@ tail -f logs/seg/benchmarks/cvc_clinicdb_dense_sfseg_epoch60_eval.log
 
 ---
 
-# 18. Freeze Dense model
+# 17. Mask-DHF + SegMARD-v2 - 60 epochs (best)
+
+## 17a. Training
 
 ```bash
-mkdir -p runs/seg/dense_sfseg/frozen
+cd ~/MedRT-SFOD
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
 
-cp \
-  runs/seg/dense_sfseg/cvc_dense_60ep/checkpoints/dense_sfseg_epoch_60.pt \
-  runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt
-
-cp \
-  runs/seg/dense_sfseg/cvc_dense_60ep/stage2_metadata.json \
-  runs/seg/dense_sfseg/frozen/
-
-cp \
-  runs/seg/benchmarks/cvc_clinicdb_dense_sfseg_epoch60_metrics.json \
-  runs/seg/dense_sfseg/frozen/
-
-sha256sum \
-  runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt \
-  | tee runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.sha256
-```
-
-Canonical Dense checkpoint:
-
-```text
-runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt
-```
-
----
-
-# 19. RASP-SFSeg structural audit
-
-```bash
-mkdir -p runs/seg/rasp_sfseg logs/seg/rasp_sfseg
-
-python scripts/YOLO26/medseg/inspect_rasp_prunable_groups_seg.py \
-  --model runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt \
-  --device 0 \
-  --imgsz 640 \
-  --audit-imgsz 256 \
-  --min-hidden 16 \
-  --min-keep-ratio 0.50 \
-  --round-to 8 \
-  --depgraph \
-  --out runs/seg/rasp_sfseg/rasp_seg_structural_audit.json \
-2>&1 | tee logs/seg/rasp_sfseg/rasp_seg_structural_audit.log
-```
-
-Expected canonical audit:
-
-```text
-eligible groups   = 13
-eligible channels = 880
-DepGraph safe     = 13/13
-```
-
----
-
-# 20. RASP-SFSeg — 60 epochs
-
-RASP main run starts from the same AdaBN checkpoint as the Dense main run.
-
-```bash
 mkdir -p \
-  runs/seg/rasp_sfseg/cvc_rasp_60ep \
-  logs/seg/rasp_sfseg
+  runs/seg/dense_sfseg/cvc_segmard_v2_60ep \
+  logs/seg/dense_sfseg
 
 nohup env PYTHONPATH="$PWD" \
-python scripts/YOLO26/medseg/stage3_rasp_sfseg.py \
+python scripts/YOLO26/medseg/stage2_dense_sfseg.py \
   --weights runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt \
   --target-images dataset/CVC-ClinicDB-YOLO26/images/target \
-  --out-dir runs/seg/rasp_sfseg/cvc_rasp_60ep \
+  --out-dir runs/seg/dense_sfseg/cvc_segmard_v2_60ep \
   --imgsz 640 \
   --batch 4 \
   --workers 4 \
@@ -664,6 +731,7 @@ python scripts/YOLO26/medseg/stage3_rasp_sfseg.py \
   --mard-lambda0 0.05 \
   --mard-lambda-max 0.2 \
   --mard-warmup-epochs 5 \
+  --mard-gate-threshold 0.5 \
   --mard-gamma 1.0 \
   --mard-alpha 1.0 \
   --mard-beta 0.1 \
@@ -672,167 +740,25 @@ python scripts/YOLO26/medseg/stage3_rasp_sfseg.py \
   --mard-bg-points 128 \
   --mard-eta 12 \
   --mard-box-conf 0.5 \
-  --rasp_enable \
-  --rasp_warmup_epochs 5 \
-  --rasp_cycle_epochs 3 \
-  --rasp_reliability_threshold 0.50 \
-  --rasp_importance_beta 0.90 \
-  --rasp_min_hidden 16 \
-  --rasp_min_keep_ratio 0.50 \
-  --rasp_round_to 8 \
-  --rasp_gmm_posterior 0.80 \
-  --rasp_gmm_bic_gain 0 \
-  --rasp_gmm_min_separation 1.0 \
-  --rasp_gmm_min_samples 16 \
-  --rasp_cost_gamma 1.0 \
-  --rasp_max_step_cost_fraction 0.05 \
+  --mard-mode mask \
+  --segmard-erode-kernel 1 \
+  --segmard-dilate-kernel 1 \
+  --segmard-hard-bg-ratio 0.5 \
   --device 0 \
   --seed 29 \
   --print-freq 20 \
   --save-interval 10 \
-> logs/seg/rasp_sfseg/cvc_rasp_60ep.log 2>&1 &
+> logs/seg/dense_sfseg/cvc_segmard_v2_60ep.log 2>&1 &
 
 echo "PID=$!"
 ```
 
-Monitor:
-
-```bash
-tail -f logs/seg/rasp_sfseg/cvc_rasp_60ep.log
-```
-
-Pruning events:
-
-```bash
-grep "status=pruned" logs/seg/rasp_sfseg/cvc_rasp_60ep.log
-```
-
-All RASP epoch summaries:
-
-```bash
-grep "RASP(" logs/seg/rasp_sfseg/cvc_rasp_60ep.log
-```
-
-Final history:
-
-```bash
-tail -10 runs/seg/rasp_sfseg/cvc_rasp_60ep/rasp_history.jsonl
-```
-
-Final RASP files:
-
-```text
-runs/seg/rasp_sfseg/cvc_rasp_60ep/checkpoints/
-├── yolo26s_rasp_sfseg_latent_epoch_60.pt
-├── rasp_sfseg_state_epoch_60.pt
-└── rasp_sfseg_state_latest.pt
-```
-
----
-
-# 21. Inspect final RASP state
-
-```bash
-python - <<'PY'
-import torch
-
-STATE = (
-    "runs/seg/rasp_sfseg/cvc_rasp_60ep/checkpoints/"
-    "rasp_sfseg_state_epoch_60.pt"
-)
-
-s = torch.load(
-    STATE,
-    map_location="cpu",
-    weights_only=False,
-)
-
-print("epoch       :", s.get("epoch"))
-print("global_step :", s.get("global_step"))
-print("format      :", s.get("format"))
-
-r = s["rasp"]
-print("enabled     :", r.get("enabled"))
-print("events      :", r.get("prune_events"))
-print("last prune  :", r.get("last_prune_epoch"))
-print("stats       :", r.get("current_stats"))
-
-pruner = r["pruner"]
-print()
-print("PER-GROUP MASKS")
-print("-" * 80)
-
-total = 0
-pruned = 0
-for name, row in pruner["groups"].items():
-    mask = row["mask"].bool()
-    h = int(mask.numel())
-    p = int((~mask).sum().item())
-    total += h
-    pruned += p
-    print(f"{name:55s} hidden={h:4d} pruned={p:4d} s={p/max(h,1):.3f}")
-
-print()
-print("total hidden :", total)
-print("total pruned :", pruned)
-print("sparsity     :", pruned / max(total, 1))
-PY
-```
-
----
-
-# 22. Physical compact export
-
-```bash
-export RASP_OUT="$HOME/MedRT-SFOD/runs/seg/rasp_sfseg/cvc_rasp_60ep"
-export RASP_STATE="$RASP_OUT/checkpoints/rasp_sfseg_state_epoch_60.pt"
-export RASP_LATENT="$RASP_OUT/checkpoints/yolo26s_rasp_sfseg_latent_epoch_60.pt"
-
-rm -f \
-  "$RASP_OUT/yolo26s_rasp_sfseg_compact.pt" \
-  "$RASP_OUT/yolo26s_rasp_sfseg_compact.pt.report.json"
-
-nohup env PYTHONPATH="$PWD" \
-python scripts/YOLO26/export_rasp_compact.py \
-  --state "$RASP_STATE" \
-  --latent_model "$RASP_LATENT" \
-  --out "$RASP_OUT/yolo26s_rasp_sfseg_compact.pt" \
-  --device 0 \
-  --verify \
-  --verify_imgsz 256 \
-  --verify_tol 2e-4 \
-  --count_macs \
-> logs/seg/rasp_sfseg/cvc_rasp_export_compact.log 2>&1 &
-
-echo "PID=$!"
-```
-
-Monitor:
-
-```bash
-tail -f logs/seg/rasp_sfseg/cvc_rasp_export_compact.log
-```
-
-Compact model:
-
-```text
-runs/seg/rasp_sfseg/cvc_rasp_60ep/yolo26s_rasp_sfseg_compact.pt
-```
-
-Compact report:
-
-```text
-runs/seg/rasp_sfseg/cvc_rasp_60ep/yolo26s_rasp_sfseg_compact.pt.report.json
-```
-
----
-
-# 23. Final compact evaluation — CVC-ClinicDB
+## 17b. Evaluation
 
 ```bash
 nohup env PYTHONPATH="$PWD" \
 python scripts/YOLO26/medseg/eval_source_seg.py \
-  --model runs/seg/rasp_sfseg/cvc_rasp_60ep/yolo26s_rasp_sfseg_compact.pt \
+  --model runs/seg/dense_sfseg/cvc_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
   --data dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
   --images dataset/CVC-ClinicDB-YOLO26/images/target \
   --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
@@ -840,305 +766,790 @@ python scripts/YOLO26/medseg/eval_source_seg.py \
   --batch 8 \
   --device 0 \
   --conf 0.25 \
-  --out runs/seg/benchmarks/cvc_clinicdb_rasp_compact_metrics.json \
-> logs/seg/benchmarks/cvc_clinicdb_rasp_compact_eval.log 2>&1 &
+  --out runs/seg/benchmarks/cvc_clinicdb_segmard_v2_metrics.json \
+> logs/seg/dense_sfseg/cvc_segmard_v2_eval.log 2>&1 &
+
+echo "PID=$!"
+```
+---
+
+# 18. BDL-v1 + SegMARD-v2
+
+## 18a. Training
+
+```bash
+cd ~/MedRT-SFOD
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
+
+mkdir -p \
+  runs/seg/dense_sfseg/cvc_bdl_v1_segmard_v2_60ep \
+  logs/seg/dense_sfseg
+
+nohup env PYTHONPATH="$PWD" \
+python scripts/YOLO26/medseg/stage2_dense_sfseg.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt \
+  --target-images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --out-dir runs/seg/dense_sfseg/cvc_bdl_v1_segmard_v2_60ep \
+  --imgsz 640 \
+  --batch 4 \
+  --workers 4 \
+  --epochs 60 \
+  --lr 1e-4 \
+  --grad-clip 10 \
+  --ema 0.999 \
+  --tau-o2o 0.5 \
+  --tau-o2m 0.5 \
+  --tau-no 0.2 \
+  --tau-dup 0.7 \
+  --mask-thr 0.5 \
+  --stability-low 0.40 \
+  --stability-high 0.60 \
+  --mask-rel-thr 0.744898 \
+  --min-mask-pixels 16 \
+  --dhf-mode bdl \
+  --bdl-tau-match 0.5 \
+  --bdl-max-witnesses 5 \
+  --bdl-boundary-kernel 3 \
+  --mard-lambda0 0.05 \
+  --mard-lambda-max 0.2 \
+  --mard-warmup-epochs 5 \
+  --mard-gate-threshold 0.5 \
+  --mard-gamma 1.0 \
+  --mard-alpha 1.0 \
+  --mard-beta 0.1 \
+  --mard-topk-boxes 15 \
+  --mard-fg-points 8 \
+  --mard-bg-points 128 \
+  --mard-eta 12 \
+  --mard-box-conf 0.5 \
+  --mard-mode mask \
+  --segmard-erode-kernel 1 \
+  --segmard-dilate-kernel 1 \
+  --segmard-hard-bg-ratio 0.5 \
+  --device 0 \
+  --seed 29 \
+  --print-freq 20 \
+  --save-interval 10 \
+> logs/seg/dense_sfseg/cvc_bdl_v1_segmard_v2_60ep.log 2>&1 &
 
 echo "PID=$!"
 ```
 
-Monitor:
+## 18b. Evaluation
 
 ```bash
-tail -f logs/seg/benchmarks/cvc_clinicdb_rasp_compact_eval.log
+cd ~/MedRT-SFOD
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
+
+mkdir -p \
+  runs/seg/benchmarks \
+  logs/seg/benchmarks
+
+python scripts/YOLO26/medseg/eval_source_seg.py \
+  --model runs/seg/dense_sfseg/cvc_bdl_v1_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
+  --data dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
+  --images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --imgsz 640 \
+  --batch 8 \
+  --device 0 \
+  --conf 0.25 \
+  --out runs/seg/benchmarks/cvc_clinicdb_bdl_v1_segmard_v2_metrics.json \
+2>&1 | tee logs/seg/benchmarks/cvc_bdl_v1_segmard_v2_eval.log
+```
+
+## 18c. Analysis BDL-v1 with ASD & HD95
+
+```bash
+python scripts/YOLO26/medseg/analyze_seg_results.py \
+  --model runs/seg/dense_sfseg/cvc_bdl_v1_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
+  --images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --out-dir runs/seg/analysis/cvc_bdl_v1_segmard_v2 \
+  --imgsz 640 \
+  --device 0 \
+  --conf 0.25 \
+  --topk 20 \
+  --seed 29 \
+2>&1 | tee logs/seg/benchmarks/cvc_bdl_v1_analysis.log
+```
+
+if you want to analysis on SegMARD-v2 baseline
+```
+python scripts/YOLO26/medseg/analyze_seg_results.py \
+  --model runs/seg/dense_sfseg/cvc_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
+  --images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --out-dir runs/seg/analysis/cvc_segmard_v2 \
+  --imgsz 640 \
+  --device 0 \
+  --conf 0.25 \
+  --topk 20 \
+  --seed 29 \
+2>&1 | tee logs/seg/benchmarks/cvc_segmard_v2_boundary_analysis.log
 ```
 
 ---
 
-# 24. Freeze final compact model
+# 19. Main DURR-v1 + SegMARD-v2 — 60 epochs
 
 ```bash
-mkdir -p runs/seg/rasp_sfseg/frozen
+mkdir -p runs/seg/dense_sfseg logs/seg/dense_sfseg
+
+nohup env PYTHONPATH="$PWD" \
+python scripts/YOLO26/medseg/stage2_dense_sfseg_durr.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt \
+  --target-images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --out-dir runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep \
+  --imgsz 640 \
+  --batch 4 \
+  --workers 4 \
+  --epochs 60 \
+  --lr 1e-4 \
+  --device 0 \
+  --seed 29 \
+  --tau-o2o 0.5 \
+  --tau-o2m 0.5 \
+  --tau-no 0.2 \
+  --tau-dup 0.7 \
+  --mask-thr 0.5 \
+  --stability-low 0.40 \
+  --stability-high 0.60 \
+  --mask-rel-thr 0.744898 \
+  --min-mask-pixels 16 \
+  --durr-tau-match 0.5 \
+  --durr-max-witnesses 5 \
+  --durr-boundary-kernel 5 \
+  --durr-route-gain 1.0 \
+  --durr-min-disagreement 0.02 \
+  --durr-rescue-conf 0.80 \
+  --durr-rescue-stability 0.80 \
+  --durr-rescue-consensus-iou 0.70 \
+  --durr-rescue-min-support 0 \
+  --durr-evidence-conf 0.10 \
+  --durr-safe-bg-teacher-prob 0.10 \
+  --durr-hall-student-thr 0.80 \
+  --durr-hall-area-thr 0.10 \
+  --durr-hall-area-weight 0.25 \
+  --durr-lambda-dir 0.10 \
+  --durr-lambda-rescue 0.20 \
+  --durr-lambda-hall 0.10 \
+  --durr-warmup-epochs 5 \
+  --mard-lambda0 0.05 \
+  --mard-lambda-max 0.20 \
+  --mard-gamma 1.0 \
+  --mard-alpha 1.0 \
+  --mard-beta 0.1 \
+  --mard-warmup-epochs 5 \
+  --mard-gate-threshold 0.5 \
+  --mard-topk-boxes 15 \
+  --mard-fg-points 8 \
+  --mard-bg-points 128 \
+  --mard-eta 12 \
+  --mard-box-conf 0.5 \
+  --segmard-erode-kernel 1 \
+  --segmard-dilate-kernel 1 \
+  --segmard-hard-bg-ratio 0.5 \
+  --save-interval 10 \
+  --analysis-gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --analysis-data-yaml dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
+  --analysis-batch 8 \
+  --analysis-conf 0.25 \
+  --analysis-max-images 0 \
+> logs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep.log 2>&1 &
+
+echo "PID=$!"
+```
+
+If we train CVC -> Kvasir:
+
+```bash
+mkdir -p runs/seg/dense_sfseg logs/seg/dense_sfseg
+
+nohup env PYTHONPATH="$PWD" \
+python scripts/YOLO26/medseg/stage2_dense_sfseg_durr.py \
+  --weights runs/seg/stage1/frozen/yolo26s_seg_kvasir_adabn.pt \
+  --target-images dataset/Kvasir-SEG-YOLO26/images/target \
+  --out-dir runs/seg/dense_sfseg/kvasir_durr_v1_segmard_v2_60ep \
+  --imgsz 640 \
+  --batch 4 \
+  --workers 4 \
+  --epochs 60 \
+  --lr 1e-4 \
+  --device 0 \
+  --seed 29 \
+  --tau-o2o 0.5 \
+  --tau-o2m 0.5 \
+  --tau-no 0.2 \
+  --tau-dup 0.7 \
+  --mask-thr 0.5 \
+  --stability-low 0.40 \
+  --stability-high 0.60 \
+  --mask-rel-thr 0.753071 \
+  --min-mask-pixels 16 \
+  --durr-tau-match 0.5 \
+  --durr-max-witnesses 5 \
+  --durr-boundary-kernel 5 \
+  --durr-route-gain 1.0 \
+  --durr-min-disagreement 0.02 \
+  --durr-rescue-conf 0.80 \
+  --durr-rescue-stability 0.80 \
+  --durr-rescue-consensus-iou 0.70 \
+  --durr-rescue-min-support 0 \
+  --durr-evidence-conf 0.10 \
+  --durr-safe-bg-teacher-prob 0.10 \
+  --durr-hall-student-thr 0.80 \
+  --durr-hall-area-thr 0.10 \
+  --durr-hall-area-weight 0.25 \
+  --durr-lambda-dir 0.10 \
+  --durr-lambda-rescue 0.20 \
+  --durr-lambda-hall 0.10 \
+  --durr-warmup-epochs 5 \
+  --mard-lambda0 0.05 \
+  --mard-lambda-max 0.20 \
+  --mard-gamma 1.0 \
+  --mard-alpha 1.0 \
+  --mard-beta 0.1 \
+  --mard-warmup-epochs 5 \
+  --mard-gate-threshold 0.5 \
+  --mard-topk-boxes 15 \
+  --mard-fg-points 8 \
+  --mard-bg-points 128 \
+  --mard-eta 12 \
+  --mard-box-conf 0.5 \
+  --segmard-erode-kernel 1 \
+  --segmard-dilate-kernel 1 \
+  --segmard-hard-bg-ratio 0.5 \
+  --save-interval 10 \
+  --analysis-gt-masks dataset/Kvasir-SEG-YOLO26/gt_masks/target \
+  --analysis-data-yaml dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml \
+  --analysis-batch 8 \
+  --analysis-conf 0.25 \
+  --analysis-max-images 0 \
+> logs/seg/dense_sfseg/cvc_kvasir_v1_segmard_v2_60ep.log 2>&1 &
+
+echo "PID=$!"
+```
+
+
+---
+
+# 21. DURR checkpoints
+
+Expected:
+
+```text
+runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/
+├── durr_student_epoch_10.pt
+├── durr_teacher_ema_epoch_10.pt
+├── ...
+├── durr_student_epoch_60.pt
+└── durr_teacher_ema_epoch_60.pt
+```
+
+Final Student:
+
+```text
+runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt
+```
+
+Final EMA Teacher:
+
+```text
+runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_teacher_ema_epoch_60.pt
+```
+
+Metadata:
+
+```text
+runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/stage2_metadata.json
+```
+
+---
+
+# 22. Automatic Teacher + Student visualization
+
+Nếu main command có:
+
+```text
+--analysis-gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target
+```
+
+thì **không cần chạy thêm visualization script**.
+
+Expected:
+
+```text
+runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/final_analysis/
+├── panels/
+├── per_image_trace.csv
+└── summary.json
+```
+
+Panel:
+
+```text
+Image
+GT
+Initial Teacher O2O
+Initial Teacher fused
+Final EMA Teacher fused
+Final Teacher O2M witnesses
+Final signed delta
+Final O2M rescue
+Final Student prediction
+Absolute Student error
+```
+
+GT chỉ được load sau training.
+
+---
+
+# 23. Official final Student evaluation
+
+```bash
+mkdir -p \
+  runs/seg/benchmarks/cvc_durr_v1_final \
+  logs/seg/benchmarks
+
+python scripts/YOLO26/medseg/evaluate_durr_final.py \
+  --model runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt \
+  --data dataset/CVC-ClinicDB-YOLO26/dataset_seg.yaml \
+  --images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --benchmark-image dataset/CVC-ClinicDB-YOLO26/images/target/1.png \
+  --out-dir runs/seg/benchmarks/cvc_durr_v1_final \
+  --imgsz 640 \
+  --eval-batch 8 \
+  --device 0 \
+  --conf 0.25 \
+  --warmup 100 \
+  --iters 500 \
+  --precision fp32 \
+2>&1 | tee logs/seg/benchmarks/cvc_durr_v1_final.log
+```
+
+
+```bash
+mkdir -p \
+  runs/seg/benchmarks/kvasir_durr_v1_final \
+  logs/seg/benchmarks
+
+python scripts/YOLO26/medseg/evaluate_durr_final.py \
+  --model runs/seg/dense_sfseg/kvasir_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt \
+  --data dataset/Kvasir-SEG-YOLO26/dataset_seg.yaml \
+  --images dataset/Kvasir-SEG-YOLO26/images/target \
+  --gt-masks dataset/Kvasir-SEG-YOLO26/gt_masks/target \
+  --out-dir runs/seg/benchmarks/kvasir_durr_v1_final \
+  --imgsz 640 \
+  --eval-batch 8 \
+  --device 0 \
+  --conf 0.25 \
+  --warmup 100 \
+  --iters 500 \
+  --precision fp32 \
+  2>&1 | tee logs/seg/benchmarks/kvasir_durr_v1_final.log
+```
+
+---
+
+# 24. Detailed post-training analysis
+
+```bash
+python scripts/YOLO26/medseg/analyze_seg_results.py \
+  --model runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
+  --images dataset/CVC-ClinicDB-YOLO26/images/target \
+  --gt-masks dataset/CVC-ClinicDB-YOLO26/gt_masks/target \
+  --out-dir runs/seg/analysis/cvc_durr_v1_segmard_v2 \
+  --imgsz 640 \
+  --device 0 \
+  --conf 0.25 \
+  --topk 20 \
+2>&1 | tee logs/seg/benchmarks/cvc_durr_v1_segmard_v2_analysis.log
+```
+
+```bash
+python scripts/YOLO26/medseg/analyze_seg_results.py \
+  --model runs/seg/dense_sfseg/kvasir_durr_v1_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt \
+  --images dataset/Kvasir-SEG-YOLO26/images/target \
+  --gt-masks dataset/Kvasir-SEG-YOLO26/gt_masks/target \
+  --out-dir runs/seg/analysis/kvasir_durr_v1_segmard_v2 \
+  --imgsz 640 \
+  --device 0 \
+  --conf 0.25 \
+  --topk 20 \
+2>&1 | tee logs/seg/benchmarks/kvasir_durr_v1_segmard_v2_analysis.log
+```
+
+Expected:
+
+```text
+summary.json
+per_image_metrics.csv
+hard_cases.csv
+pred_masks/
+plots/
+visualizations/
+```
+
+Metrics:
+- Dice;
+- IoU;
+- Precision;
+- Sensitivity;
+- Specificity;
+- ASD;
+- HD95.
+
+---
+
+# 25. Old-run Teacher vs Student tracing
+
+New DURR run đã auto-trace.
+
+Chỉ dùng:
+
+```text
+trace_teacher_student_masks.py
+```
+
+cho old checkpoints khi:
+- không save EMA Teacher;
+- không có `final_analysis/`.
+
+---
+
+# 26. Speed benchmark
+
+Primary protocol:
+
+```text
+GPU     RTX 4060 Ti
+imgsz   640
+batch   1
+FP32
+warmup  100
+iters   500
+CUDA synchronization
+```
+
+Command:
+
+```bash
+mkdir -p runs/seg/benchmarks logs/seg/benchmarks
+
+python scripts/YOLO26/medseg/benchmark_seg_speed.py \
+  --model runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt \
+  --image dataset/CVC-ClinicDB-YOLO26/images/target/1.png \
+  --out runs/seg/benchmarks/cvc_durr_v1_speed_fp32.json \
+  --imgsz 640 \
+  --device 0 \
+  --conf 0.25 \
+  --warmup 100 \
+  --iters 500 \
+  --precision fp32 \
+2>&1 | tee logs/seg/benchmarks/cvc_durr_v1_speed_fp32.log
+```
+
+Real-time criterion:
+
+```text
+FPS >= 30
+latency <= 33.3 ms
+```
+
+Report raw forward và E2E riêng.
+
+---
+
+# 27. Optional TensorRT FP16
+
+```bash
+yolo export \
+  model=runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt \
+  format=engine \
+  imgsz=640 \
+  batch=1 \
+  half=True \
+  device=0
+```
+
+Không trộn TensorRT FP16 với primary FP32 result.
+
+---
+
+# 28. Optional BDL-v1 reproduction
+
+BDL-v1 là rejected ablation.
+
+Check:
+
+```bash
+python scripts/YOLO26/medseg/stage2_dense_sfseg_bdl.py --help
+```
+
+Canonical BDL configuration:
+
+```text
+--dhf-mode bdl
+--bdl-tau-match 0.5
+--bdl-max-witnesses 5
+--bdl-boundary-kernel 3
+--mard-mode mask
+--segmard-erode-kernel 1
+--segmard-dilate-kernel 1
+--segmard-hard-bg-ratio 0.5
+```
+
+Không tiếp tục tune BDL bằng CVC GT.
+
+---
+
+# 29. Optional RASP
+
+RASP hiện là supplementary / negative compression experiment.
+
+Relevant files:
+
+```text
+scripts/YOLO26/medseg/inspect_rasp_prunable_groups_seg.py
+scripts/YOLO26/medseg/stage3_rasp_sfseg.py
+scripts/YOLO26/rasp_pruning.py
+scripts/YOLO26/export_rasp_compact.py
+```
+
+Không thuộc current DURR main method.
+
+---
+
+# 30. Freeze final DURR artifacts
+
+Sau official evaluation:
+
+```bash
+mkdir -p runs/seg/dense_sfseg/frozen
 
 cp \
-  runs/seg/rasp_sfseg/cvc_rasp_60ep/yolo26s_rasp_sfseg_compact.pt \
-  runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.pt
+  runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_student_epoch_60.pt \
+  runs/seg/dense_sfseg/frozen/cvc_durr_v1_student_epoch60.pt
 
 cp \
-  runs/seg/rasp_sfseg/cvc_rasp_60ep/yolo26s_rasp_sfseg_compact.pt.report.json \
-  runs/seg/rasp_sfseg/frozen/
+  runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/checkpoints/durr_teacher_ema_epoch_60.pt \
+  runs/seg/dense_sfseg/frozen/cvc_durr_v1_teacher_ema_epoch60.pt
 
 cp \
-  runs/seg/benchmarks/cvc_clinicdb_rasp_compact_metrics.json \
-  runs/seg/rasp_sfseg/frozen/
+  runs/seg/dense_sfseg/cvc_durr_v1_segmard_v2_60ep/stage2_metadata.json \
+  runs/seg/dense_sfseg/frozen/
 
 sha256sum \
-  runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.pt \
-  | tee runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.sha256
-```
-
-Canonical final model:
-
-```text
-runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.pt
+  runs/seg/dense_sfseg/frozen/cvc_durr_v1_student_epoch60.pt \
+  | tee runs/seg/dense_sfseg/frozen/cvc_durr_v1_student_epoch60.sha256
 ```
 
 ---
 
-# 25. Same-protocol FP32 latency/FPS benchmark
+# 31. Artifact tree
 
-## 25.1. Dense model
+```text
+runs/seg/
+├── source/
+│   └── frozen/
+│       └── kvasir_yolo26s_seg_source_best.pt
+│
+├── stage1/
+│   └── frozen/
+│       └── yolo26s_seg_cvc_adabn.pt
+│
+├── dense_sfseg/
+│   ├── cvc_segmard_v2_60ep/
+│   ├── cvc_bdl_v1_segmard_v2_60ep/
+│   ├── cvc_durr_v1_segmard_v2_60ep/
+│   │   ├── checkpoints/
+│   │   ├── final_analysis/
+│   │   └── stage2_metadata.json
+│   └── frozen/
+│
+├── analysis/
+└── benchmarks/
+```
+
+Logs:
+
+```text
+logs/seg/source/
+logs/seg/stage1/
+logs/seg/dense_sfseg/
+logs/seg/rasp_sfseg/
+logs/seg/benchmarks/
+```
+
+---
+
+# 32. Source-free protocol checklist
+
+```text
+[ ] Source labels chỉ dùng source supervised training
+[ ] CVC images dùng cho AdaBN / Stage-2
+[ ] CVC target labels không đọc trong adaptation
+[ ] CVC GT không đọc trong adaptation
+[ ] GT visualization chỉ post-training
+[ ] Không GT early stopping
+[ ] Không GT best-epoch selection
+[ ] tau_r lấy label-free target statistics
+[ ] Student + EMA Teacher đều được save
+[ ] Official model = frozen epoch-60 Student
+[ ] Same speed protocol cho mọi model
+```
+
+---
+
+# 33. Debug — wrong Ultralytics
+
+Nếu traceback chứa:
+
+```text
+.venv/lib/python3.12/site-packages/ultralytics
+```
+
+chạy:
 
 ```bash
+cd ~/MedRT-SFOD
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
+
 python - <<'PY'
-import time
-import json
-import torch
-from ultralytics import YOLO
-
-MODEL = "runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt"
-OUT = "runs/seg/benchmarks/cvc_dense_fp32_latency.json"
-DEVICE = torch.device("cuda:0")
-B = 1
-H = W = 640
-WARMUP = 100
-RUNS = 500
-
-m = YOLO(MODEL).model.to(DEVICE).float().eval()
-x = torch.randn(B, 3, H, W, device=DEVICE)
-
-with torch.inference_mode():
-    for _ in range(WARMUP):
-        _ = m(x)
-
-    torch.cuda.synchronize()
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
-    start.record()
-    for _ in range(RUNS):
-        _ = m(x)
-    end.record()
-    torch.cuda.synchronize()
-
-ms = float(start.elapsed_time(end)) / RUNS
-fps = 1000.0 * B / ms
-
-result = {
-    "model": MODEL,
-    "precision": "FP32",
-    "batch": B,
-    "imgsz": [H, W],
-    "warmup": WARMUP,
-    "runs": RUNS,
-    "latency_ms": ms,
-    "fps": fps,
-}
-
-print(json.dumps(result, indent=2))
-open(OUT, "w").write(json.dumps(result, indent=2))
+import ultralytics
+print(ultralytics.__file__)
 PY
 ```
 
-## 25.2. Compact model
+Phải là local repo.
+
+---
+
+# 34. Debug — CUDA OOM
+
+Giảm:
+
+```text
+--batch 4
+```
+
+xuống:
+
+```text
+--batch 2
+```
+
+Giữ `imgsz=640` nếu muốn reproduce official protocol.
+
+---
+
+# 35. Debug — `route=0`
+
+Check:
+- `DURRmatch`;
+- witness count;
+- `--durr-min-disagreement`;
+- boundary kernel.
+
+Không tune threshold bằng GT.
+
+---
+
+# 36. Debug — `rescue=0`
+
+Check:
+- có O2O-miss images không;
+- có accepted O2M coverage extras không;
+- rescue confidence;
+- stability;
+- support requirement.
+
+---
+
+# 37. Debug — `hall=0/0`
+
+Check:
+- có Teacher-empty images không;
+- Student high-confidence area có vượt threshold không;
+- safe background map có pixel không.
+
+`hall=0` không tự động nghĩa là code lỗi; có thể chỉ là trigger không xảy ra.
+
+---
+
+# 38. Run order từ đầu đến cuối
+
+```text
+01 Environment
+02 Prepare Kvasir
+03 YOLO26 pre-flight
+04 Source training
+05 Source validation
+06 Freeze source
+07 Prepare CVC
+08 Source-only CVC eval
+09 AdaBN
+10 AdaBN eval
+11 Freeze AdaBN
+12 Dual-head audit
+13 Mask-DHF audit
+14 Stability audit → tau_r
+15 Reproduce SegMARD-v2 if needed
+16 DURR smoke
+17 DURR 60 epochs
+18 Automatic Teacher/Student trace
+19 Official Student eval
+20 ASD/HD95 analysis
+21 Speed benchmark
+22 Freeze final artifacts
+23 Multi-seed
+24 Extra-domain experiments
+```
+
+---
+
+# 39. Tránh target-test overfitting
+
+Sau khi đã nhìn CVC GT / hard cases:
+- không chỉnh threshold chỉ để chữa một vài ảnh rồi report cùng CVC như test độc lập;
+- không chọn epoch tốt nhất bằng CVC GT;
+- không tune DURR trên ảnh 78/258;
+- nếu cần tuning tiếp, pre-specify ablation hoặc dùng protocol validation hợp lệ.
+
+---
+
+# 40. Final readiness check
 
 ```bash
+cd ~/MedRT-SFOD
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
+
 python - <<'PY'
-import json
+from pathlib import Path
 import torch
-from ultralytics import YOLO
+import ultralytics
 
-MODEL = "runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.pt"
-OUT = "runs/seg/benchmarks/cvc_rasp_compact_fp32_latency.json"
-DEVICE = torch.device("cuda:0")
-B = 1
-H = W = 640
-WARMUP = 100
-RUNS = 500
+print("repo        :", Path.cwd())
+print("ultralytics :", ultralytics.__file__)
+print("cuda        :", torch.cuda.is_available())
+print("gpu         :", torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
 
-m = YOLO(MODEL).model.to(DEVICE).float().eval()
-x = torch.randn(B, 3, H, W, device=DEVICE)
+paths = [
+    "runs/seg/source/frozen/kvasir_yolo26s_seg_source_best.pt",
+    "runs/seg/stage1/frozen/yolo26s_seg_cvc_adabn.pt",
+    "scripts/YOLO26/medseg/durr_seg.py",
+    "scripts/YOLO26/medseg/stage2_dense_sfseg_durr.py",
+]
 
-with torch.inference_mode():
-    for _ in range(WARMUP):
-        _ = m(x)
-
-    torch.cuda.synchronize()
-    start = torch.cuda.Event(enable_timing=True)
-    end = torch.cuda.Event(enable_timing=True)
-    start.record()
-    for _ in range(RUNS):
-        _ = m(x)
-    end.record()
-    torch.cuda.synchronize()
-
-ms = float(start.elapsed_time(end)) / RUNS
-fps = 1000.0 * B / ms
-
-result = {
-    "model": MODEL,
-    "precision": "FP32",
-    "batch": B,
-    "imgsz": [H, W],
-    "warmup": WARMUP,
-    "runs": RUNS,
-    "latency_ms": ms,
-    "fps": fps,
-}
-
-print(json.dumps(result, indent=2))
-open(OUT, "w").write(json.dumps(result, indent=2))
+for p in paths:
+    print("[OK]" if Path(p).exists() else "[MISS]", p)
 PY
 ```
 
----
-
-# 26. TensorRT FP16 export
-
-Dense:
-
-```bash
-yolo export \
-  model=runs/seg/dense_sfseg/frozen/cvc_dense_sfseg_epoch60.pt \
-  format=engine \
-  imgsz=640 \
-  batch=1 \
-  half=True \
-  device=0
-```
-
-Compact:
-
-```bash
-yolo export \
-  model=runs/seg/rasp_sfseg/frozen/cvc_rasp_sfseg_final.pt \
-  format=engine \
-  imgsz=640 \
-  batch=1 \
-  half=True \
-  device=0
-```
-
----
-
-# 27. Main artifacts
-
-```text
-SOURCE
-runs/seg/source/frozen/
-├── kvasir_yolo26s_seg_source_best.pt
-├── kvasir_yolo26s_seg_source_best.sha256
-├── split_train.txt
-└── split_val.txt
-
-STAGE 1
-runs/seg/stage1/frozen/
-└── yolo26s_seg_cvc_adabn.pt
-
-DENSE MEDRT-SFSEG
-runs/seg/dense_sfseg/frozen/
-├── cvc_dense_sfseg_epoch60.pt
-├── cvc_dense_sfseg_epoch60.sha256
-├── stage2_metadata.json
-└── cvc_clinicdb_dense_sfseg_epoch60_metrics.json
-
-RASP-SFSEG
-runs/seg/rasp_sfseg/cvc_rasp_60ep/checkpoints/
-├── yolo26s_rasp_sfseg_latent_epoch_60.pt
-├── rasp_sfseg_state_epoch_60.pt
-└── rasp_sfseg_state_latest.pt
-
-FINAL COMPACT
-runs/seg/rasp_sfseg/frozen/
-├── cvc_rasp_sfseg_final.pt
-├── cvc_rasp_sfseg_final.sha256
-├── yolo26s_rasp_sfseg_compact.pt.report.json
-└── cvc_clinicdb_rasp_compact_metrics.json
-```
-
----
-
-# 28. Main benchmark files
-
-```text
-runs/seg/benchmarks/
-├── kvasir_yolo26s_seg_source_metrics.json
-├── cvc_clinicdb_source_only_metrics.json
-├── cvc_clinicdb_adabn_metrics.json
-├── cvc_clinicdb_dense_sfseg_epoch60_metrics.json
-├── cvc_clinicdb_rasp_compact_metrics.json
-├── cvc_dense_fp32_latency.json
-└── cvc_rasp_compact_fp32_latency.json
-```
-
----
-
-# 29. Pipeline order
-
-```text
-RAW Kvasir-SEG
-    ↓
-Prepare YOLO26 segmentation dataset
-    ↓
-YOLO26-S-Seg source training — 100 epochs
-    ↓
-Source validation
-    ↓
-Freeze source checkpoint
-    ↓
-RAW CVC-ClinicDB
-    ↓
-Prepare CVC target dataset
-    ↓
-Source-only target evaluation
-    ↓
-AdaBN — target images only
-    ↓
-Freeze AdaBN checkpoint
-    ↓
-Dual-head pseudo-label audit
-    ↓
-Mask-DHF audit
-    ↓
-Mask-stability audit
-    ↓
-Dense MedRT-SFSeg — 60 epochs
-    ↓
-Dense target evaluation
-    ↓
-Freeze Dense checkpoint
-    ↓
-RASP-SFSeg structural / DepGraph audit
-    ↓
-RASP-SFSeg — 60 epochs
-    ↓
-Physical compact export
-    ↓
-Masked-vs-compact numerical equivalence
-    ↓
-Compact CVC evaluation
-    ↓
-Freeze final compact checkpoint
-    ↓
-FP32 latency / FPS
-    ↓
-TensorRT FP16 export / benchmark
-```
-
----
-
-# 30. Source-free protocol checklist
-
-```text
-[ ] Source Kvasir labels used only for supervised source training
-[ ] CVC target images used for AdaBN / Stage-2 / RASP adaptation
-[ ] CVC target labels NOT read during adaptation
-[ ] CVC GT masks NOT read during adaptation
-[ ] No target-GT early stopping
-[ ] No target-GT pruning decision
-[ ] No target-GT pruning-ratio selection
-[ ] No target-GT best-epoch selection
-[ ] Dense official checkpoint = epoch 60
-[ ] RASP official checkpoint = epoch 60
-[ ] Physical compaction equivalence PASS before reporting Params/MACs
-[ ] Dense and compact latency measured with same hardware/input/batch/precision
-```
-
+Nếu core files `[OK]`, project đã sẵn sàng cho Stage-2.
