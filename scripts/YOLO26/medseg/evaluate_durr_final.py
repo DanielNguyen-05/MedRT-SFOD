@@ -278,6 +278,9 @@ def main() -> None:
 
     seg = official.get("seg", {})
     macro = analysis.get("medical_macro", {})
+    distributions = analysis.get("distributions", {})
+    asd_dist = distributions.get("asd", {})
+    hd95_dist = distributions.get("hd95", {})
     e2e = speed.get("end_to_end", {})
     net = speed.get("network_forward", {})
 
@@ -304,6 +307,11 @@ def main() -> None:
         "medical_macro": macro,
         "medical_global": analysis.get("medical_global", {}),
         "boundary_status_counts": analysis.get("boundary_status_counts", {}),
+        "boundary_valid_counts": analysis.get("boundary_valid_counts", {}),
+        "boundary_distributions": {
+            "asd": asd_dist,
+            "hd95": hd95_dist,
+        },
         "boundary_metric_units": analysis.get(
             "boundary_metric_units", {"asd": "mm", "hd95": "mm"}
         ),
@@ -360,8 +368,10 @@ def main() -> None:
 | Precision | {_fmt(macro.get('precision'), 6)} |
 | Sensitivity | {_fmt(macro.get('sensitivity'), 6)} |
 | Specificity | {_fmt(macro.get('specificity'), 6)} |
-| ASD (mm) | {_fmt(macro.get('asd'), 6)} |
-| HD95 (mm) | {_fmt(macro.get('hd95'), 6)} |
+| ASD (mm), mean ± std | {_fmt(macro.get('asd'), 6)} ± {_fmt(asd_dist.get('std'), 6)} |
+| ASD valid / excluded | {asd_dist.get('valid_n', 'N/A')} / {asd_dist.get('excluded_n', 'N/A')} |
+| HD95 (mm), mean ± std | {_fmt(macro.get('hd95'), 6)} ± {_fmt(hd95_dist.get('std'), 6)} |
+| HD95 valid / excluded | {hd95_dist.get('valid_n', 'N/A')} / {hd95_dist.get('excluded_n', 'N/A')} |
 | Full graph Params (M) | {_fmt(profile.get('full_training_graph_params_M'), 3)} |
 | Fused deployment Params (M) | {_fmt(profile.get('deployment_fused_params_M'), 3)} |
 | Deployment GMACs | {_fmt(profile.get('deployment_GMACs'), 3)} |
@@ -384,6 +394,8 @@ def main() -> None:
 - CUDA synchronization: yes
 - Disk I/O included in E2E timing: no
 - GPU: {report['hardware']['gpu_name']}
+- Boundary empty-mask handling: if either prediction or GT is empty, ASD/HD95 are NaN for that image and excluded from boundary aggregation; failure counts are reported separately.
+- Boundary spacing convention: unit spacing (1.0, 1.0), reported in mm to match the HEAL-style protocol used for comparison.
 """
     (out_dir / "paper_metrics.md").write_text(md, encoding="utf-8")
 
@@ -397,8 +409,18 @@ def main() -> None:
     print(f"Precision     : {_fmt(macro.get('precision'), 6)}")
     print(f"Sensitivity   : {_fmt(macro.get('sensitivity'), 6)}")
     print(f"Specificity   : {_fmt(macro.get('specificity'), 6)}")
-    print(f"ASD           : {_fmt(macro.get('asd'), 3)} mm")
-    print(f"HD95          : {_fmt(macro.get('hd95'), 3)} mm")
+    print(
+        f"ASD           : {_fmt(macro.get('asd'), 3)} ± "
+        f"{_fmt(asd_dist.get('std'), 3)} mm "
+        f"(valid={asd_dist.get('valid_n', 'N/A')}, "
+        f"excluded={asd_dist.get('excluded_n', 'N/A')})"
+    )
+    print(
+        f"HD95          : {_fmt(macro.get('hd95'), 3)} ± "
+        f"{_fmt(hd95_dist.get('std'), 3)} mm "
+        f"(valid={hd95_dist.get('valid_n', 'N/A')}, "
+        f"excluded={hd95_dist.get('excluded_n', 'N/A')})"
+    )
     print(f"Params full   : {_fmt(profile.get('full_training_graph_params_M'), 3)} M")
     print(f"Params fused  : {_fmt(profile.get('deployment_fused_params_M'), 3)} M")
     print(f"GFLOPs        : {_fmt(profile.get('deployment_GFLOPs'), 3)}")
