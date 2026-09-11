@@ -31,9 +31,10 @@ Boundary metrics:
 
 Empty-mask convention
 ---------------------
-- both prediction and GT empty: ASD=HD95=0
-- exactly one empty: ASD=HD95=image diagonal in unit-spacing mm
-  and boundary_status records the case explicitly.
+- Following the HEAL-style ASD protocol, if either prediction or GT is empty,
+  ASD and HD95 are undefined (NaN) for that image.
+- NaN boundary cases are excluded from dataset-level ASD/HD95 mean/std/quantiles
+  and are reported separately through boundary_status_counts.
 """
 
 from __future__ import annotations
@@ -41,7 +42,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 import random
 from pathlib import Path
 from typing import Any
@@ -133,13 +133,12 @@ def overlap_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | int]:
 
 
 def binary_surface(mask: np.ndarray) -> np.ndarray:
-    """One-pixel inner surface using 3x3 erosion."""
-    x = (mask > 0).astype(np.uint8)
+    """HEAL-compatible inner surface using scipy binary_erosion defaults."""
+    x = (mask > 0).astype(bool)
     if not x.any():
         return np.zeros_like(x, dtype=bool)
-    kernel = np.ones((3, 3), dtype=np.uint8)
-    eroded = cv2.erode(x, kernel, iterations=1)
-    return np.logical_and(x.astype(bool), ~eroded.astype(bool))
+    eroded = binary_erosion(x)
+    return np.logical_and(x, ~eroded)
 
 
 def distances_to_surface_mm(
@@ -181,29 +180,22 @@ def average_surface_distance_heal_mm(
 def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str | int]:
     p = pred.astype(bool)
     g = gt.astype(bool)
-    h, w = p.shape
-    diagonal_mm = float(math.hypot(
-        h * BOUNDARY_VOXEL_SPACING_MM[0],
-        w * BOUNDARY_VOXEL_SPACING_MM[1],
-    ))
 
     p_any = bool(p.any())
     g_any = bool(g.any())
 
-    if not p_any and not g_any:
-        return {
-            "asd": 0.0,
-            "hd95": 0.0,
-            "boundary_status": "both_empty",
-            "pred_surface_pixels": 0,
-            "gt_surface_pixels": 0,
-        }
-
+    # Match HEAL-style empty-mask handling: boundary distance is undefined
+    # whenever either mask is empty. Keep the failure visible via status, but
+    # exclude it from aggregate ASD/HD95 with NaN-aware statistics below.
     if not p_any or not g_any:
+        if not p_any and not g_any:
+            status = "both_empty"
+        else:
+            status = "pred_empty" if not p_any else "gt_empty"
         return {
-            "asd": diagonal_mm,
-            "hd95": diagonal_mm,
-            "boundary_status": "pred_empty" if not p_any else "gt_empty",
+            "asd": float("nan"),
+            "hd95": float("nan"),
+            "boundary_status": status,
             "pred_surface_pixels": int(binary_surface(p).sum()),
             "gt_surface_pixels": int(binary_surface(g).sum()),
         }
@@ -211,29 +203,29 @@ def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str |
     ps = binary_surface(p)
     gs = binary_surface(g)
 
-    # Defensive fallback for pathological one-pixel morphology cases.
     if not ps.any() or not gs.any():
         return {
-            "asd": diagonal_mm,
-            "hd95": diagonal_mm,
+            "asd": float("nan"),
+            "hd95": float("nan"),
             "boundary_status": "surface_empty",
             "pred_surface_pixels": int(ps.sum()),
             "gt_surface_pixels": int(gs.sum()),
         }
 
+    # ASD: keep the HEAL repository formula exactly.
+    asd_mm = average_surface_distance_heal_mm(
+        g, p, voxel_spacing=BOUNDARY_VOXEL_SPACING_MM
+    )
+
+    # HD95: bidirectional surface-to-surface distances using the same unit
+    # spacing convention, so it is reported in the same mm unit.
     dt_to_gt = distances_to_surface_mm(gs, BOUNDARY_VOXEL_SPACING_MM)
     dt_to_pred = distances_to_surface_mm(ps, BOUNDARY_VOXEL_SPACING_MM)
-
     d_pred_to_gt = dt_to_gt[ps]
     d_gt_to_pred = dt_to_pred[gs]
-
     pooled = np.concatenate(
         [d_pred_to_gt.astype(np.float64), d_gt_to_pred.astype(np.float64)],
         axis=0,
-    )
-
-    asd_mm = average_surface_distance_heal_mm(
-        g, p, voxel_spacing=BOUNDARY_VOXEL_SPACING_MM
     )
 
     return {
@@ -245,11 +237,20 @@ def surface_metrics(pred: np.ndarray, gt: np.ndarray) -> dict[str, float | str |
     }
 
 
-def percentile_summary(values: list[float]) -> dict[str, float]:
+def finite_values(values: list[float]) -> np.ndarray:
+    """Return only finite values, excluding NaN/Inf boundary failures."""
     x = np.asarray(values, dtype=np.float64)
+    return x[np.isfinite(x)]
+
+
+def percentile_summary(values: list[float]) -> dict[str, float | int]:
+    raw = np.asarray(values, dtype=np.float64)
+    x = raw[np.isfinite(raw)]
     if x.size == 0:
-        return {}
+        return {"valid_n": 0, "excluded_n": int(raw.size)}
     return {
+        "valid_n": int(x.size),
+        "excluded_n": int(raw.size - x.size),
         "mean": float(x.mean()),
         "std": float(x.std()),
         "min": float(x.min()),
@@ -281,12 +282,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def save_single_plot(values: list[float], title: str, xlabel: str, out: Path) -> None:
-    if plt is None or not values:
+    values_arr = finite_values(values)
+    if plt is None or values_arr.size == 0:
         return
     out.parent.mkdir(parents=True, exist_ok=True)
     fig = plt.figure(figsize=(7.0, 4.5))
     ax = fig.add_subplot(111)
-    ax.hist(values, bins=30)
+    ax.hist(values_arr, bins=30)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Images")
@@ -298,10 +300,16 @@ def save_single_plot(values: list[float], title: str, xlabel: str, out: Path) ->
 def save_scatter(x: list[float], y: list[float], xlabel: str, ylabel: str, title: str, out: Path) -> None:
     if plt is None or not x or not y:
         return
+    xa = np.asarray(x, dtype=np.float64)
+    ya = np.asarray(y, dtype=np.float64)
+    keep = np.isfinite(xa) & np.isfinite(ya)
+    if not np.any(keep):
+        return
+    xa, ya = xa[keep], ya[keep]
     out.parent.mkdir(parents=True, exist_ok=True)
     fig = plt.figure(figsize=(6.0, 5.0))
     ax = fig.add_subplot(111)
-    ax.scatter(x, y, s=12, alpha=0.65)
+    ax.scatter(xa, ya, s=12, alpha=0.65)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -398,10 +406,18 @@ def select_cases(rows: list[dict[str, Any]], topk: int, seed: int) -> dict[str, 
     k = min(topk, len(rows))
     rng = random.Random(seed)
     random_rows = rng.sample(rows, k) if k > 0 else []
+
+    finite_asd = [r for r in rows if np.isfinite(float(r["asd"]))]
+    finite_hd95 = [r for r in rows if np.isfinite(float(r["hd95"]))]
+
     return {
         "hard_by_dice": sorted(rows, key=lambda r: float(r["dice"]))[:k],
-        "hard_by_hd95": sorted(rows, key=lambda r: float(r["hd95"]), reverse=True)[:k],
-        "hard_by_asd": sorted(rows, key=lambda r: float(r["asd"]), reverse=True)[:k],
+        "hard_by_hd95": sorted(
+            finite_hd95, key=lambda r: float(r["hd95"]), reverse=True
+        )[:min(k, len(finite_hd95))],
+        "hard_by_asd": sorted(
+            finite_asd, key=lambda r: float(r["asd"]), reverse=True
+        )[:min(k, len(finite_asd))],
         "hard_by_fp": sorted(rows, key=lambda r: int(r["fp"]), reverse=True)[:k],
         "hard_by_fn": sorted(rows, key=lambda r: int(r["fn"]), reverse=True)[:k],
         "random": random_rows,
@@ -520,16 +536,24 @@ def main() -> None:
         if idx == 1 or idx % 25 == 0 or idx == len(image_paths):
             print(
                 f"[{idx:04d}/{len(image_paths):04d}] {image_path.name} "
-                f"Dice={row['dice']:.4f} ASD={row['asd']:.2f}mm HD95={row['hd95']:.2f}mm"
+                f"Dice={row['dice']:.4f} "
+                f"ASD={row['asd']:.2f}mm HD95={row['hd95']:.2f}mm "
+                f"status={row['boundary_status']}"
             )
 
-    metric_keys = [
-        "dice", "iou", "precision", "sensitivity", "specificity", "asd", "hd95"
+    overlap_metric_keys = [
+        "dice", "iou", "precision", "sensitivity", "specificity"
     ]
+    boundary_metric_keys = ["asd", "hd95"]
+    metric_keys = overlap_metric_keys + boundary_metric_keys
+
     macro = {
         key: float(np.mean([float(r[key]) for r in rows]))
-        for key in metric_keys
+        for key in overlap_metric_keys
     }
+    for key in boundary_metric_keys:
+        vals = finite_values([float(r[key]) for r in rows])
+        macro[key] = float(vals.mean()) if vals.size else float("nan")
 
     tp, fp, fn, tn = totals["tp"], totals["fp"], totals["fn"], totals["tn"]
     global_metrics = {
@@ -570,12 +594,18 @@ def main() -> None:
             "asd_spacing_mm": list(BOUNDARY_VOXEL_SPACING_MM),
             "hd95": "95th percentile of pooled bidirectional surface-to-surface distances computed with scipy EDT sampling",
             "hd95_spacing_mm": list(BOUNDARY_VOXEL_SPACING_MM),
-            "one_empty_penalty": "image diagonal in mm",
+            "empty_mask_handling": "NaN if either prediction or GT is empty; excluded from ASD/HD95 aggregation",
         },
         "medical_macro": macro,
         "medical_global": global_metrics,
         "distributions": distributions,
         "boundary_status_counts": boundary_status_counts,
+        "boundary_valid_counts": {
+            "asd_valid": int(distributions["asd"].get("valid_n", 0)),
+            "asd_excluded": int(distributions["asd"].get("excluded_n", 0)),
+            "hd95_valid": int(distributions["hd95"].get("valid_n", 0)),
+            "hd95_excluded": int(distributions["hd95"].get("excluded_n", 0)),
+        },
     }
 
     (out_dir / "summary.json").write_text(
@@ -653,8 +683,18 @@ def main() -> None:
     print(f"Macro Precision  : {macro['precision']:.6f}")
     print(f"Macro Sensitivity: {macro['sensitivity']:.6f}")
     print(f"Macro Specificity: {macro['specificity']:.6f}")
-    print(f"Macro ASD        : {macro['asd']:.6f} mm")
-    print(f"Macro HD95       : {macro['hd95']:.6f} mm")
+    print(
+        f"Macro ASD        : {macro['asd']:.6f} ± "
+        f"{distributions['asd'].get('std', float('nan')):.6f} mm "
+        f"(valid={distributions['asd'].get('valid_n', 0)}, "
+        f"excluded={distributions['asd'].get('excluded_n', 0)})"
+    )
+    print(
+        f"Macro HD95       : {macro['hd95']:.6f} ± "
+        f"{distributions['hd95'].get('std', float('nan')):.6f} mm "
+        f"(valid={distributions['hd95'].get('valid_n', 0)}, "
+        f"excluded={distributions['hd95'].get('excluded_n', 0)})"
+    )
     print(f"Params           : {params / 1e6:.3f} M")
     print("Boundary statuses:", boundary_status_counts)
     print("Saved summary    :", out_dir / "summary.json")
