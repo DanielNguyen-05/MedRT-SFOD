@@ -5,6 +5,7 @@ torch-pruning>=1.5.3
 pillow
 six
 matplotlib
+opencv-python
 
 
 # pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # chọn bản cu12x khớp driver GPU

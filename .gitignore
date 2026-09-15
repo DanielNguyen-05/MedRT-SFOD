@@ -78,8 +78,8 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # Logs / temporary files
-logs/
-*.log
+# logs/
+# *.log
 *.out
 *.err
 *.pid
