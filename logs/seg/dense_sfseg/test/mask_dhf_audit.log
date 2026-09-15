@@ -1,0 +1,41 @@
+========================================================================
+MASK-DHF FULL TARGET AUDIT
+========================================================================
+images        : 612
+labels loaded : NO
+GT masks used : NO
+tau_o2o       : 0.5
+tau_o2m       : 0.5
+tau_no        : 0.2
+tau_dup       : 0.7
+mask_thr      : 0.5
+mask_rel_thr  : 0.65
+mask_no       : 0.2
+[Batch 001/077] anchors=6 candidates=44 reliable=44 extra=2 fused=8
+[Batch 020/077] anchors=120 candidates=1057 reliable=1057 extra=19 fused=139
+[Batch 040/077] anchors=242 candidates=2054 reliable=2053 extra=38 fused=280
+[Batch 060/077] anchors=373 candidates=3175 reliable=3174 extra=52 fused=425
+[Batch 077/077] anchors=484 candidates=4128 reliable=4127 extra=71 fused=555
+
+========================================================================
+MASK-DHF AUDIT RESULTS
+========================================================================
+anchors                     : 484
+candidates                  : 4128
+candidate_valid_mask        : 4128
+candidate_reliable          : 4127
+rejected_reliability        : 1
+rejected_box_overlap        : 3747
+rejected_mask_overlap       : 0
+extras                      : 71
+fused_after_mask_filter     : 555
+images_with_pseudo          : 532
+images_without_pseudo       : 80
+
+mask confidence   : {'n': 4128, 'mean': 0.9585310015394244, 'median': 0.9622257649898529, 'p05': 0.918386709690094, 'p10': 0.9344877004623413, 'p25': 0.950290247797966, 'p75': 0.971345454454422, 'p90': 0.9781224191188812, 'p95': 0.9819191724061965, 'min': 0.8355746865272522, 'max': 0.9905250072479248}
+mask reliability  : {'n': 4128, 'mean': 0.8311682852894761, 'median': 0.8514584898948669, 'p05': 0.7119558781385422, 'p10': 0.7351464688777923, 'p25': 0.7939489781856537, 'p75': 0.8759073466062546, 'p90': 0.890200924873352, 'p95': 0.8985271126031875, 'min': 0.647257924079895, 'max': 0.9249267578125}
+
+avg fused/image   : 0.9068627450980392
+
+[PASS] Mask-DHF audit complete
+saved: /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/mask_dhf_audit.json

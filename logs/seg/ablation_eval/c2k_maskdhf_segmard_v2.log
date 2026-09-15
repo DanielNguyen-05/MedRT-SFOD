@@ -1,0 +1,68 @@
+==============================================================================
+MEDRT-SFSEG POST-TRAINING ANALYSIS
+==============================================================================
+model        : /home/dang/MedRT-SFOD/runs/seg/ablation/c2k_maskdhf_segmard_v2_60ep/checkpoints/dense_sfseg_epoch_60.pt
+images       : 1000
+GT used      : YES, EVALUATION ONLY
+ASD/HD95 unit: mm / mm
+output       : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/c2k_maskdhf_segmard_v2
+
+[0001/1000] cju0qkwl35piu0993l0dewei2.jpg Dice=0.7766 ASD=10.50mm HD95=88.63mm status=ok
+[0025/1000] cju15mhjczc8z0801kit5c6di.jpg Dice=0.9113 ASD=4.03mm HD95=39.82mm status=ok
+[0050/1000] cju18ibp219ub08783i6o98g7.jpg Dice=0.8594 ASD=2.05mm HD95=13.00mm status=ok
+[0075/1000] cju1cvkfwqrec0993wbp1jlzm.jpg Dice=0.8062 ASD=14.48mm HD95=150.79mm status=ok
+[0100/1000] cju1f5x1164xv08555654c24r.jpg Dice=0.9388 ASD=4.51mm HD95=16.00mm status=ok
+[0125/1000] cju1hp9i2xu8e0988u2dazk7m.jpg Dice=0.9566 ASD=1.52mm HD95=10.05mm status=ok
+[0150/1000] cju2lyynuymli0855g7fxgbhe.jpg Dice=0.0303 ASD=29.06mm HD95=126.75mm status=ok
+[0175/1000] cju2p0eveqtdc0835gpi3p93i.jpg Dice=0.9642 ASD=1.30mm HD95=9.85mm status=ok
+[0200/1000] cju2raxlosl630988jdbfy9b0.jpg Dice=0.8023 ASD=11.25mm HD95=104.42mm status=ok
+[0225/1000] cju2syxa93yw40799x2iuwabz.jpg Dice=0.9249 ASD=1.13mm HD95=7.78mm status=ok
+[0250/1000] cju2uy8ox62jo0801g88hh42z.jpg Dice=0.9471 ASD=1.38mm HD95=8.54mm status=ok
+[0275/1000] cju2yi9tz8vky0801yqip0xyl.jpg Dice=0.0000 ASD=nanmm HD95=nanmm status=pred_empty
+[0300/1000] cju2zwg05a0oy0801yr73ig7g.jpg Dice=0.9589 ASD=1.48mm HD95=10.63mm status=ok
+[0325/1000] cju3128yi0rpu0988o4oo5n8n.jpg Dice=0.9224 ASD=1.81mm HD95=12.04mm status=ok
+[0350/1000] cju334jzo261t0835yqudnfs1.jpg Dice=0.9755 ASD=3.21mm HD95=11.00mm status=ok
+[0375/1000] cju34xspwzenf0993cyzajv9n.jpg Dice=0.9474 ASD=1.99mm HD95=12.53mm status=ok
+[0400/1000] cju3u39fog1bo0871lxjrabks.jpg Dice=0.9597 ASD=3.07mm HD95=12.00mm status=ok
+[0425/1000] cju3xjqtpikx50817tppy6g84.jpg Dice=0.9355 ASD=3.32mm HD95=24.18mm status=ok
+[0450/1000] cju410dnfl0960755y8lu8d79.jpg Dice=0.6205 ASD=7.76mm HD95=79.00mm status=ok
+[0475/1000] cju42xpi8lw4w0871ve317a1p.jpg Dice=0.9431 ASD=1.66mm HD95=9.22mm status=ok
+[0500/1000] cju5bbtwsa8cl0987wgfsqpao.jpg Dice=0.9335 ASD=2.36mm HD95=21.47mm status=ok
+[0525/1000] cju5es375cnzy0801nkq35ffs.jpg Dice=0.9351 ASD=1.90mm HD95=12.04mm status=ok
+[0550/1000] cju5i5oh2efg60987ez6cpf72.jpg Dice=0.9578 ASD=2.79mm HD95=40.44mm status=ok
+[0575/1000] cju5uxjnol2r509871qv2yeia.jpg Dice=0.4889 ASD=26.14mm HD95=165.51mm status=ok
+[0600/1000] cju5wuhm1lwm40987vugqn3vv.jpg Dice=0.9313 ASD=2.14mm HD95=11.40mm status=ok
+[0625/1000] cju6v1m1xv07w09870ah3njy1.jpg Dice=0.9006 ASD=1.91mm HD95=18.00mm status=ok
+[0650/1000] cju6xifswvwbo0987nibtdr50.jpg Dice=0.9153 ASD=7.07mm HD95=51.00mm status=ok
+[0675/1000] cju77j66ez52p08019xygi0co.jpg Dice=0.8832 ASD=2.23mm HD95=14.16mm status=ok
+[0700/1000] cju7arvfe1ldu0850erdmphgj.jpg Dice=0.9557 ASD=2.68mm HD95=13.08mm status=ok
+[0725/1000] cju7ctvqn25dy08186g442m1r.jpg Dice=0.5952 ASD=17.45mm HD95=155.00mm status=ok
+[0750/1000] cju7dn24o296i09871qfxb8s2.jpg Dice=0.4177 ASD=24.30mm HD95=172.92mm status=ok
+[0775/1000] cju7er4kc2opa0801anuxc0eb.jpg Dice=0.9637 ASD=1.60mm HD95=12.06mm status=ok
+[0800/1000] cju7fob3x301u0755x985pmmq.jpg Dice=0.9471 ASD=1.78mm HD95=19.16mm status=ok
+[0825/1000] cju84aoa3ktwn0755pfl4gfwd.jpg Dice=0.7472 ASD=13.28mm HD95=84.63mm status=ok
+[0850/1000] cju85qefyln6v0850szeb9byi.jpg Dice=0.9609 ASD=4.32mm HD95=38.00mm status=ok
+[0875/1000] cju88itqbny720987hxizbj5y.jpg Dice=0.0718 ASD=44.37mm HD95=235.18mm status=ok
+[0900/1000] cju8abobpqbir08189u01huru.jpg Dice=0.9391 ASD=5.52mm HD95=18.00mm status=ok
+[0925/1000] cju8b7aqtr4a00987coba14b7.jpg Dice=0.8552 ASD=2.41mm HD95=17.80mm status=ok
+[0950/1000] cju8c5223s8j80850b4kealt4.jpg Dice=0.3762 ASD=30.72mm HD95=235.94mm status=ok
+[0975/1000] cju8doa16u5gh0818w1ywda3q.jpg Dice=0.3226 ASD=47.84mm HD95=255.54mm status=ok
+[1000/1000] ck2da7fwcjfis07218r1rvm95.jpg Dice=0.9516 ASD=1.07mm HD95=8.00mm status=ok
+
+==============================================================================
+POST-TRAINING SEGMENTATION ANALYSIS RESULTS
+==============================================================================
+Macro Dice       : 0.807423
+Macro IoU        : 0.725584
+Macro Precision  : 0.920486
+Macro Sensitivity: 0.763946
+Macro Specificity: 0.990355
+Macro ASD        : 9.897731 ± 19.509667 mm (valid=982, excluded=18)
+Macro HD95       : 65.412953 ± 94.754528 mm (valid=982, excluded=18)
+Params           : 10.366 M
+Boundary statuses: {'ok': 982, 'pred_empty': 18}
+Saved summary    : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/c2k_maskdhf_segmard_v2/summary.json
+Saved per-image  : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/c2k_maskdhf_segmard_v2/per_image_metrics.csv
+Saved hard cases : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/c2k_maskdhf_segmard_v2/hard_cases.csv
+Saved visuals    : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/c2k_maskdhf_segmard_v2/visualizations
+[PASS] Post-training analysis completed

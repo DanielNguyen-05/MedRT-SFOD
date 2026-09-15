@@ -1,0 +1,26 @@
+nohup: ignoring input
+========================================================================
+PHYSICAL COMPACTION VERIFICATION
+========================================================================
+verification_device=cpu
+verification_imgsz=256
+verification_tol=0.0002
+
+masked-vs-compact CPU full max_abs_diff=7.62939453e-05
+masked-vs-compact CPU postprocess max_abs_diff=7.62939453e-05
+masked-vs-compact CPU raw max_abs_diff=6.86645508e-05
+
+[PASS] Physical compaction numerical equivalence
+
+========================================================================
+RASP PHYSICAL COMPACT EXPORT
+========================================================================
+dense_params   = 21.785M
+compact_params = 21.255M
+parameter_reduction = 2.44%
+dense_MACs@256 = 5.957G
+compact_MACs@256 = 5.683G
+MAC_reduction = 4.60%
+
+saved compact model: /home/dang/research/runs/c2f_rasp_yolo26m/yolo26m_rasp_compact.pt
+saved report: /home/dang/research/runs/c2f_rasp_yolo26m/yolo26m_rasp_compact.pt.report.json

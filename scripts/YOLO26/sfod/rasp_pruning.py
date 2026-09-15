@@ -219,7 +219,17 @@ class AdaptiveHiddenPruner:
         gmm_min_samples: int = 16,
         cost_gamma: float = 1.0,
         seed: int = 29,
-        exclude_name_substrings: Iterable[str] = ("one2one", "one2many", ".dfl", "c2psa", ".attn", ".psa"),
+        exclude_name_substrings: Iterable[str] = (
+            "one2one",
+            "one2many",
+            ".dfl",
+            "c2psa",
+            ".attn",
+            ".psa",
+            "proto",
+            "mask_head",
+            "mask_coefficient",
+        ),
     ):
         if not 0.0 <= importance_beta < 1.0:
             raise ValueError("importance_beta must be in [0, 1)")

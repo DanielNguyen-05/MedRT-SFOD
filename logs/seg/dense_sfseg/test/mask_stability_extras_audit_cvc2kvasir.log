@@ -1,0 +1,45 @@
+========================================================================
+MASK STABILITY AUDIT — BOX-DHF EXTRAS
+========================================================================
+images        : 1000
+labels loaded : NO
+GT masks used : NO
+
+tau_o2o       : 0.5
+tau_o2m       : 0.5
+tau_no        : 0.2
+tau_dup       : 0.7
+mask_thr      : 0.5
+stability     : 0.4 vs 0.6
+[Batch 001/125] anchors=6 candidates=54 novel=12 extras=2
+[Batch 020/125] anchors=151 candidates=1319 novel=37 extras=10
+[Batch 040/125] anchors=306 candidates=2681 novel=71 extras=20
+[Batch 060/125] anchors=473 candidates=4087 novel=116 extras=29
+[Batch 080/125] anchors=632 candidates=5505 novel=153 extras=36
+[Batch 100/125] anchors=785 candidates=6821 novel=185 extras=41
+[Batch 120/125] anchors=946 candidates=8184 novel=225 extras=52
+[Batch 125/125] anchors=983 candidates=8525 novel=239 extras=54
+
+========================================================================
+EXTRA MASK-STABILITY AUDIT RESULTS
+========================================================================
+anchors                : 983
+O2M candidates         : 8525
+valid-mask candidates  : 8525
+box-novel before NMS   : 239
+Box-DHF extras         : 54
+
+box confidence         : {'n': 54, 'mean': 0.7106018011216764, 'median': 0.7072003185749054, 'p05': 0.533195960521698, 'p10': 0.5472301423549653, 'p25': 0.6194902509450912, 'p50': 0.7072003185749054, 'p75': 0.8221741616725922, 'p90': 0.8537185966968537, 'p95': 0.8953853040933607, 'min': 0.521679162979126, 'max': 0.9336908459663391}
+foreground mask conf   : {'n': 54, 'mean': 0.9429024601424182, 'median': 0.9499450922012329, 'p05': 0.8922087252140045, 'p10': 0.9059927761554718, 'p25': 0.9242781400680542, 'p50': 0.9499450922012329, 'p75': 0.9636875241994858, 'p90': 0.9718686699867248, 'p95': 0.9750381410121918, 'min': 0.8624603152275085, 'max': 0.9804454445838928}
+mask stability         : {'n': 54, 'mean': 0.9378901797312277, 'median': 0.9439393877983093, 'p05': 0.8882794469594956, 'p10': 0.9007888495922088, 'p25': 0.9197250306606293, 'p50': 0.9439393877983093, 'p75': 0.9606307297945023, 'p90': 0.9712399363517761, 'p95': 0.9755408257246018, 'min': 0.8004338145256042, 'max': 0.982758641242981}
+new mask reliability   : {'n': 54, 'mean': 0.8139088871302428, 'median': 0.8121011555194855, 'p05': 0.6928148150444031, 'p10': 0.7075612723827363, 'p25': 0.7530713528394699, 'p50': 0.8121011555194855, 'p75': 0.8873538374900818, 'p90': 0.9032675504684449, 'p95': 0.9293186247348785, 'min': 0.6869712471961975, 'max': 0.9529685974121094}
+
+Threshold simulation:
+  r >= 0.700000: keep=50 remove=4 ratio=0.926 images_extra=47
+  r >= 0.750000: keep=41 remove=13 ratio=0.759 images_extra=39
+  r >= 0.753071: keep=40 remove=14 ratio=0.741 images_extra=38
+  r >= 0.800000: keep=30 remove=24 ratio=0.556 images_extra=30
+  r >= 0.850000: keep=19 remove=35 ratio=0.352 images_extra=19
+
+[PASS] extra mask-stability audit complete
+saved: /home/dang/MedRT-SFOD/runs/seg/dense_sfseg/mask_stability_extras_audit.json

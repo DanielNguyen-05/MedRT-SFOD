@@ -1,0 +1,74 @@
+nohup: ignoring input
+==============================================================================
+RT-SFOD PRE-FLIGHT AUDIT — YOLO26
+==============================================================================
+Model : /home/dang/research/runs/c2f_stage1_official_yolo26m_pretrained/yolo26_stage1_adabnrc_foggy_cityscapes.pt
+Data  : dataset/c2f_yolo/foggy_cityscapes/foggy_cityscapes.yaml
+IoU diagnostic threshold : 0.5
+NOTE: target-val GT is used ONLY for diagnostic audit, not training/model selection.
+Images: 500
+processed 50/500
+processed 100/500
+processed 150/500
+processed 200/500
+processed 250/500
+processed 300/500
+processed 350/500
+processed 400/500
+processed 450/500
+processed 500/500
+
+==============================================================================
+GLOBAL RESULTS
+==============================================================================
+GT objects : 10180
+
+O2O
+--------------------------------------------------
+TP              : 4451
+FP              : 372
+FN              : 5729
+Precision       : 0.9229
+Recall          : 0.4372
+F1              : 0.5933
+Boxes / image   : 9.65
+Confidence mean : 0.8317
+Confidence std  : 0.1296
+
+DHF
+--------------------------------------------------
+TP              : 4594
+FP              : 445
+FN              : 5586
+Precision       : 0.9117
+Recall          : 0.4513
+F1              : 0.6037
+Boxes / image   : 10.08
+Confidence mean : 0.8231
+Confidence std  : 0.1352
+
+==============================================================================
+DHF PER-CLASS
+==============================================================================
+ 0 person       P=0.887 R=0.425 F1=0.574 TP=1452 FP=185 FN=1967
+ 1 rider        P=0.868 R=0.507 F1=0.640 TP=282 FP=43 FN=274
+ 2 car          P=0.957 R=0.492 F1=0.650 TP=2298 FP=104 FN=2369
+ 3 truck        P=0.750 R=0.226 F1=0.347 TP=21 FP=7 FN=72
+ 4 bus          P=0.938 R=0.306 F1=0.462 TP=30 FP=2 FN=68
+ 5 train        P=0.833 R=0.217 F1=0.345 TP=5 FP=1 FN=18
+ 6 motorcycle   P=0.810 R=0.342 F1=0.481 TP=51 FP=12 FN=98
+ 7 bicycle      P=0.833 R=0.387 F1=0.529 TP=455 FP=91 FN=720
+
+==============================================================================
+PAPER REFERENCE
+==============================================================================
+O2O reference: P≈0.923, R≈0.446, F1≈0.602
+DHF reference: P≈0.919, R≈0.525, F1≈0.668
+DHF cold-start precision in paper: ≈0.920
+Important: this script uses IoU=0.50 as a diagnostic proxy; interpret exact agreement with paper cautiously.
+
+==============================================================================
+AUDIT VERDICT
+==============================================================================
+Verdict : PASS
+Reason  : DHF keeps high precision while improving coverage/F1 over O2O.

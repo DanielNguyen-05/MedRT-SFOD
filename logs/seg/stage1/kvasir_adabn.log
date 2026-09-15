@@ -1,0 +1,62 @@
+nohup: ignoring input
+WARNING ⚠️ Ultralytics settings reset to default values. This may be due to a possible problem with your settings or a recent ultralytics package update. 
+View Ultralytics Settings with 'yolo settings' or at '/home/dang/.config/Ultralytics/settings.json'
+Update Settings with 'yolo settings key=value', i.e. 'yolo settings runs_dir=path/to/dir'. For help see https://docs.ultralytics.com/quickstart/#ultralytics-settings.
+========================================================================
+STAGE 1 — YOLO26-S-SEG AdaBN
+========================================================================
+weights       : /home/dang/MedRT-SFOD/runs/seg/source/frozen/cvc_yolo26s_seg_source_best.pt
+target images : /home/dang/MedRT-SFOD/dataset/Kvasir-SEG-YOLO26/images/target
+output        : /home/dang/MedRT-SFOD/runs/seg/stage1/kvasir_adabn/yolo26s_seg_cvc_adabn.pt
+device        : cuda:0
+imgsz         : 640
+batch         : 8
+epochs        : 2
+flip_prob     : 0.5
+seed          : 29
+
+[Protocol]
+  target labels loaded : NO
+  target masks loaded  : NO
+  loss                 : NO
+  backward             : NO
+  optimizer            : NO
+  BN running stats     : UPDATE
+
+target image count: 1000
+
+[Load] source checkpoint
+BatchNorm layers: 134
+trainable parameters: 0
+
+[AdaBN] start
+[Epoch 1/2] batch=1/125 seen=8/1000 shape=(8, 3, 640, 640)
+[Epoch 1/2] batch=20/125 seen=160/1000 shape=(8, 3, 640, 640)
+[Epoch 1/2] batch=40/125 seen=320/1000 shape=(8, 3, 640, 640)
+[Epoch 1/2] batch=60/125 seen=480/1000 shape=(8, 3, 608, 640)
+[Epoch 1/2] batch=80/125 seen=640/1000 shape=(8, 3, 608, 640)
+[Epoch 1/2] batch=100/125 seen=800/1000 shape=(8, 3, 640, 640)
+[Epoch 1/2] batch=120/125 seen=960/1000 shape=(8, 3, 576, 640)
+[Epoch 1/2] batch=125/125 seen=1000/1000 shape=(8, 3, 608, 640)
+[Epoch 1] images=1000 time=13.27s
+[Epoch 2/2] batch=1/125 seen=8/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=20/125 seen=160/1000 shape=(8, 3, 640, 640)
+[Epoch 2/2] batch=40/125 seen=320/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=60/125 seen=480/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=80/125 seen=640/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=100/125 seen=800/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=120/125 seen=960/1000 shape=(8, 3, 608, 640)
+[Epoch 2/2] batch=125/125 seen=1000/1000 shape=(8, 3, 640, 640)
+[Epoch 2] images=1000 time=12.37s
+
+[BN delta]
+bn_layers: 134
+changed_bn_layers: 132
+mean_abs_running_mean_delta: 0.014919515901789027
+mean_abs_running_var_delta: 0.28247165140446534
+
+========================================================================
+[PASS] Stage-1 AdaBN completed
+========================================================================
+checkpoint: /home/dang/MedRT-SFOD/runs/seg/stage1/kvasir_adabn/yolo26s_seg_cvc_adabn.pt
+metadata  : /home/dang/MedRT-SFOD/runs/seg/stage1/kvasir_adabn/adabn_metadata.json

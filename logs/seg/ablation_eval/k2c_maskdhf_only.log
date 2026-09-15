@@ -1,0 +1,53 @@
+==============================================================================
+MEDRT-SFSEG POST-TRAINING ANALYSIS
+==============================================================================
+model        : /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_60.pt
+images       : 612
+GT used      : YES, EVALUATION ONLY
+ASD/HD95 unit: mm / mm
+output       : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/k2c_maskdhf_only
+
+[0001/0612] 1.png Dice=0.5617 ASD=7.24mm HD95=63.75mm status=ok
+[0025/0612] 120.png Dice=0.5476 ASD=18.78mm HD95=149.08mm status=ok
+[0050/0612] 143.png Dice=0.9582 ASD=0.49mm HD95=4.00mm status=ok
+[0075/0612] 166.png Dice=0.9504 ASD=0.71mm HD95=6.40mm status=ok
+[0100/0612] 189.png Dice=0.9422 ASD=0.80mm HD95=6.00mm status=ok
+[0125/0612] 210.png Dice=0.7270 ASD=16.88mm HD95=159.87mm status=ok
+[0150/0612] 233.png Dice=0.5816 ASD=15.66mm HD95=95.46mm status=ok
+[0175/0612] 256.png Dice=0.4444 ASD=15.26mm HD95=94.23mm status=ok
+[0200/0612] 279.png Dice=0.9568 ASD=0.42mm HD95=3.00mm status=ok
+[0225/0612] 300.png Dice=0.9654 ASD=0.51mm HD95=4.00mm status=ok
+[0250/0612] 323.png Dice=0.9569 ASD=0.81mm HD95=5.00mm status=ok
+[0275/0612] 346.png Dice=0.9546 ASD=0.72mm HD95=5.00mm status=ok
+[0300/0612] 369.png Dice=0.8159 ASD=1.72mm HD95=11.40mm status=ok
+[0325/0612] 391.png Dice=0.9599 ASD=0.51mm HD95=3.01mm status=ok
+[0350/0612] 413.png Dice=0.7847 ASD=3.36mm HD95=23.84mm status=ok
+[0375/0612] 436.png Dice=0.9288 ASD=1.13mm HD95=8.00mm status=ok
+[0400/0612] 459.png Dice=0.9177 ASD=1.04mm HD95=6.12mm status=ok
+[0425/0612] 481.png Dice=0.9000 ASD=2.51mm HD95=35.43mm status=ok
+[0450/0612] 503.png Dice=0.9711 ASD=0.85mm HD95=12.10mm status=ok
+[0475/0612] 526.png Dice=0.9635 ASD=0.63mm HD95=4.00mm status=ok
+[0500/0612] 549.png Dice=0.6340 ASD=14.14mm HD95=86.85mm status=ok
+[0525/0612] 571.png Dice=0.9110 ASD=0.80mm HD95=7.07mm status=ok
+[0550/0612] 594.png Dice=0.7689 ASD=3.90mm HD95=39.03mm status=ok
+[0575/0612] 65.png Dice=0.8828 ASD=0.87mm HD95=7.00mm status=ok
+[0600/0612] 88.png Dice=0.9321 ASD=0.90mm HD95=6.00mm status=ok
+[0612/0612] 99.png Dice=0.9624 ASD=0.64mm HD95=5.74mm status=ok
+
+==============================================================================
+POST-TRAINING SEGMENTATION ANALYSIS RESULTS
+==============================================================================
+Macro Dice       : 0.805672
+Macro IoU        : 0.727960
+Macro Precision  : 0.804520
+Macro Sensitivity: 0.876776
+Macro Specificity: 0.969104
+Macro ASD        : 5.465961 ± 10.792556 mm (valid=595, excluded=17)
+Macro HD95       : 37.786998 ± 54.855277 mm (valid=595, excluded=17)
+Params           : 10.366 M
+Boundary statuses: {'ok': 595, 'pred_empty': 17}
+Saved summary    : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/k2c_maskdhf_only/summary.json
+Saved per-image  : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/k2c_maskdhf_only/per_image_metrics.csv
+Saved hard cases : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/k2c_maskdhf_only/hard_cases.csv
+Saved visuals    : /home/dang/MedRT-SFOD/runs/seg/analysis/ablation/k2c_maskdhf_only/visualizations
+[PASS] Post-training analysis completed

@@ -1,0 +1,691 @@
+nohup: ignoring input
+========================================================================
+DENSE MEDRT-SFSEG STAGE-2
+========================================================================
+target images : 612
+labels used   : NO
+GT masks used : NO
+epochs        : 60
+batch         : 4
+
+DHF mode      : mask
+Mask-DHF rel  : 0.744898
+stability     : 0.4 0.6
+
+MARD lambda0  : 0.0
+MARD warmup   : 5.0
+MARD mode     : mask
+FG definition : inside Teacher pseudo segmentation mask
+FG erosion    : 1
+mask dilation : 1
+hard BG ratio : 0.0
+reliability wt: OFF
+var/cov obj.   : unchanged
+[E01] batch=001/153 pseudo=4 loss=9.6759 seg=0.6057 semseg=0.7655 mard=1.9622 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.878/0.795/0.944 wmean=1.000 grad_preclip=137.58
+[E01] batch=020/153 pseudo=3 loss=3.1001 seg=0.3749 semseg=0.1098 mard=2.0913 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.899/0.859/0.946 wmean=1.000 grad_preclip=24.52
+[E01] batch=040/153 pseudo=3 loss=4.7677 seg=0.5701 semseg=0.2460 mard=2.0652 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.866/0.732/0.945 wmean=1.000 grad_preclip=81.96
+[E01] batch=060/153 pseudo=5 loss=7.6890 seg=0.7495 semseg=0.2586 mard=2.0729 lambda=0.000000 box_extra=3 mask_extra=3 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.878/0.831/0.938 wmean=1.000 grad_preclip=178.90
+[E01] batch=080/153 pseudo=4 loss=11.1640 seg=0.5875 semseg=0.8787 mard=2.0793 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.807/0.692/0.935 wmean=1.000 grad_preclip=123.60
+[E01] batch=100/153 pseudo=4 loss=4.0403 seg=0.3573 semseg=0.0899 mard=2.0476 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.928/0.875/0.955 wmean=1.000 grad_preclip=43.63
+[E01] batch=120/153 pseudo=4 loss=23.9102 seg=0.6255 semseg=3.2399 mard=2.0269 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.859/0.748/0.946 wmean=1.000 grad_preclip=616.63
+[E01] batch=140/153 pseudo=3 loss=14.3671 seg=0.7525 semseg=2.3910 mard=2.0447 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.813/0.687/0.955 wmean=1.000 grad_preclip=286.45
+[E01] batch=153/153 pseudo=4 loss=23.3129 seg=1.5652 semseg=4.7922 mard=2.0868 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.863/0.804/0.941 wmean=1.000 grad_preclip=269.72
+
+[Epoch 01] DONE time=32.6s valid=153 skipped=0 pseudo=532 anchors=477 box_extra=78 mask_extra=55 reject_rel=23 loss=8.3158 seg=0.7888 semseg=0.7187 mard=2.0630 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1290.0 rel=0.877/0.660/0.968 wmean=1.000
+[E02] batch=001/153 pseudo=3 loss=6.4665 seg=0.5399 semseg=0.7790 mard=2.0665 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.873/0.813/0.903 wmean=1.000 grad_preclip=117.37
+[E02] batch=020/153 pseudo=3 loss=5.5588 seg=0.5715 semseg=0.2931 mard=2.0638 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.899/0.831/0.936 wmean=1.000 grad_preclip=111.99
+[E02] batch=040/153 pseudo=2 loss=3.5337 seg=0.4587 semseg=0.2952 mard=2.0637 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.805/0.713/0.898 wmean=1.000 grad_preclip=165.68
+[E02] batch=060/153 pseudo=5 loss=6.0179 seg=0.4939 semseg=0.1524 mard=2.0497 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.883/0.792/0.956 wmean=1.000 grad_preclip=84.40
+[E02] batch=080/153 pseudo=4 loss=15.2720 seg=1.0026 semseg=1.4659 mard=2.1438 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.862/0.671/0.953 wmean=1.000 grad_preclip=284.86
+[E02] batch=100/153 pseudo=3 loss=5.2346 seg=0.5574 semseg=0.3567 mard=2.1042 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.921/0.901/0.937 wmean=1.000 grad_preclip=54.88
+[E02] batch=120/153 pseudo=4 loss=14.3780 seg=0.8165 semseg=1.3243 mard=2.0042 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.853/0.743/0.922 wmean=1.000 grad_preclip=414.91
+[E02] batch=140/153 pseudo=3 loss=5.1104 seg=0.4883 semseg=0.2427 mard=2.0558 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.936/0.930/0.944 wmean=1.000 grad_preclip=93.99
+[E02] batch=153/153 pseudo=3 loss=7.6107 seg=0.6826 semseg=0.3566 mard=2.0519 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.879/0.850/0.902 wmean=1.000 grad_preclip=111.04
+
+[Epoch 02] DONE time=31.3s valid=152 skipped=1 pseudo=541 anchors=481 box_extra=85 mask_extra=60 reject_rel=25 loss=8.2099 seg=0.7056 semseg=0.6829 mard=2.0646 lambda_avg=0.000000 FG/HBG/EBG=28.5/0.0/1313.7 rel=0.874/0.660/0.968 wmean=1.000
+[E03] batch=001/153 pseudo=3 loss=6.7749 seg=0.9973 semseg=0.2838 mard=2.0699 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.836/0.783/0.875 wmean=1.000 grad_preclip=95.60
+[E03] batch=020/153 pseudo=2 loss=2.7838 seg=0.4272 semseg=0.1402 mard=2.0415 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.910/0.905/0.914 wmean=1.000 grad_preclip=26.49
+[E03] batch=040/153 pseudo=4 loss=9.6404 seg=0.6144 semseg=0.9805 mard=2.0379 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.917/0.886/0.938 wmean=1.000 grad_preclip=158.87
+[E03] batch=060/153 pseudo=5 loss=7.6118 seg=0.6196 semseg=0.6325 mard=2.0319 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.883/0.792/0.934 wmean=1.000 grad_preclip=161.14
+[E03] batch=080/153 pseudo=3 loss=15.9665 seg=1.5595 semseg=2.1125 mard=2.0576 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.823/0.690/0.934 wmean=1.000 grad_preclip=210.51
+[E03] batch=100/153 pseudo=2 loss=5.8217 seg=0.8798 semseg=0.6022 mard=2.0454 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.917/0.892/0.941 wmean=1.000 grad_preclip=89.21
+[E03] batch=120/153 pseudo=3 loss=5.2517 seg=0.5825 semseg=0.1771 mard=2.1201 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.916/0.831/0.958 wmean=1.000 grad_preclip=111.21
+[E03] batch=140/153 pseudo=4 loss=4.8288 seg=0.6295 semseg=0.1658 mard=2.0997 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.895/0.795/0.949 wmean=1.000 grad_preclip=32.01
+[E03] batch=153/153 pseudo=4 loss=3.7692 seg=0.3664 semseg=0.1358 mard=2.0519 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.923/0.872/0.948 wmean=1.000 grad_preclip=29.83
+
+[Epoch 03] DONE time=31.5s valid=153 skipped=0 pseudo=525 anchors=469 box_extra=87 mask_extra=56 reject_rel=31 loss=7.7350 seg=0.7145 semseg=0.6332 mard=2.0669 lambda_avg=0.000000 FG/HBG/EBG=27.5/0.0/1275.0 rel=0.878/0.660/0.968 wmean=1.000
+[E04] batch=001/153 pseudo=3 loss=3.2478 seg=0.4539 semseg=0.1108 mard=2.1228 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.924/0.884/0.946 wmean=1.000 grad_preclip=19.02
+[E04] batch=020/153 pseudo=3 loss=4.0125 seg=0.4439 semseg=0.1922 mard=2.1241 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.928/0.920/0.933 wmean=1.000 grad_preclip=31.81
+[E04] batch=040/153 pseudo=3 loss=5.5885 seg=0.5896 semseg=0.4043 mard=2.0387 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.881/0.741/0.957 wmean=1.000 grad_preclip=88.76
+[E04] batch=060/153 pseudo=3 loss=2.6299 seg=0.3033 semseg=0.1051 mard=2.0881 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.934/0.915/0.961 wmean=1.000 grad_preclip=20.66
+[E04] batch=080/153 pseudo=2 loss=4.1712 seg=0.7621 semseg=0.5742 mard=2.1710 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.930/0.903/0.957 wmean=1.000 grad_preclip=110.43
+[E04] batch=100/153 pseudo=3 loss=3.2928 seg=0.4492 semseg=0.1437 mard=2.0723 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.941/0.934/0.947 wmean=1.000 grad_preclip=24.47
+[E04] batch=120/153 pseudo=4 loss=4.4952 seg=0.5056 semseg=0.1371 mard=2.0808 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.932/0.898/0.948 wmean=1.000 grad_preclip=28.97
+[E04] batch=140/153 pseudo=2 loss=3.0442 seg=0.4882 semseg=0.1655 mard=2.0800 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.906/0.864/0.948 wmean=1.000 grad_preclip=58.63
+[E04] batch=153/153 pseudo=3 loss=26.0111 seg=2.3705 semseg=4.6139 mard=2.1776 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.881/0.750/0.960 wmean=1.000 grad_preclip=170.08
+
+[Epoch 04] DONE time=31.3s valid=153 skipped=0 pseudo=533 anchors=473 box_extra=82 mask_extra=60 reject_rel=22 loss=8.0795 seg=0.7550 semseg=0.6985 mard=2.0678 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1285.0 rel=0.876/0.660/0.968 wmean=1.000
+[E05] batch=001/153 pseudo=1 loss=1.3394 seg=0.2586 semseg=0.1530 mard=2.0453 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.865/0.865/0.865 wmean=1.000 grad_preclip=12.72
+[E05] batch=020/153 pseudo=3 loss=6.9402 seg=0.8688 semseg=0.5331 mard=2.0441 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.868/0.800/0.930 wmean=1.000 grad_preclip=56.20
+[E05] batch=040/153 pseudo=4 loss=7.9779 seg=0.7857 semseg=0.2803 mard=2.0296 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.917/0.829/0.951 wmean=1.000 grad_preclip=248.35
+[E05] batch=060/153 pseudo=4 loss=9.5304 seg=0.7280 semseg=0.4343 mard=2.0468 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.878/0.808/0.951 wmean=1.000 grad_preclip=208.59
+[E05] batch=080/153 pseudo=5 loss=8.3886 seg=0.6452 semseg=0.3308 mard=2.0750 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.897/0.830/0.944 wmean=1.000 grad_preclip=54.54
+[E05] batch=100/153 pseudo=2 loss=2.7258 seg=0.3722 semseg=0.1084 mard=2.0622 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.894/0.868/0.921 wmean=1.000 grad_preclip=18.99
+[E05] batch=120/153 pseudo=3 loss=4.6472 seg=0.4227 semseg=0.1416 mard=2.0060 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.852/0.753/0.938 wmean=1.000 grad_preclip=42.83
+[E05] batch=140/153 pseudo=2 loss=3.3311 seg=0.4980 semseg=0.2766 mard=2.1412 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.875/0.824/0.926 wmean=1.000 grad_preclip=26.33
+[E05] batch=153/153 pseudo=3 loss=4.3728 seg=0.4048 semseg=0.1457 mard=2.0468 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.876/0.760/0.967 wmean=1.000 grad_preclip=28.61
+
+[Epoch 05] DONE time=31.6s valid=153 skipped=0 pseudo=535 anchors=473 box_extra=81 mask_extra=62 reject_rel=19 loss=7.7261 seg=0.6523 semseg=0.6246 mard=2.0681 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1300.1 rel=0.877/0.673/0.968 wmean=1.000
+[E06] batch=001/153 pseudo=3 loss=7.0944 seg=0.7215 semseg=0.3427 mard=2.0275 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.836/0.748/0.917 wmean=1.000 grad_preclip=116.20
+[E06] batch=020/153 pseudo=3 loss=7.5832 seg=0.4801 semseg=0.9973 mard=2.1035 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.903/0.864/0.926 wmean=1.000 grad_preclip=338.33
+[E06] batch=040/153 pseudo=4 loss=16.0035 seg=0.9446 semseg=1.2676 mard=2.0232 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.843/0.761/0.952 wmean=1.000 grad_preclip=234.72
+[E06] batch=060/153 pseudo=3 loss=9.3097 seg=1.1055 semseg=0.8377 mard=2.1020 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.801/0.690/0.864 wmean=1.000 grad_preclip=139.55
+[E06] batch=080/153 pseudo=3 loss=3.8868 seg=0.5430 semseg=0.1575 mard=2.1479 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.936/0.927/0.950 wmean=1.000 grad_preclip=26.49
+[E06] batch=100/153 pseudo=5 loss=6.1609 seg=0.4631 semseg=0.2040 mard=2.0742 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.831/0.695/0.939 wmean=1.000 grad_preclip=146.27
+[E06] batch=120/153 pseudo=4 loss=10.2764 seg=0.8792 semseg=0.5234 mard=2.0208 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.808/0.753/0.903 wmean=1.000 grad_preclip=149.89
+[E06] batch=140/153 pseudo=3 loss=6.7708 seg=0.4654 semseg=0.9337 mard=2.0509 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.895/0.795/0.957 wmean=1.000 grad_preclip=70.88
+[E06] batch=153/153 pseudo=4 loss=14.4670 seg=0.7318 semseg=1.7928 mard=2.0489 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.854/0.739/0.951 wmean=1.000 grad_preclip=444.72
+
+[Epoch 06] DONE time=31.6s valid=153 skipped=0 pseudo=534 anchors=479 box_extra=74 mask_extra=55 reject_rel=19 loss=7.7013 seg=0.6728 semseg=0.6661 mard=2.0684 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1287.5 rel=0.876/0.657/0.968 wmean=1.000
+[E07] batch=001/153 pseudo=4 loss=4.4890 seg=0.3288 semseg=0.1414 mard=2.0581 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.906/0.855/0.944 wmean=1.000 grad_preclip=36.62
+[E07] batch=020/153 pseudo=4 loss=6.0683 seg=0.5062 semseg=0.1990 mard=2.1110 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.817/0.934 wmean=1.000 grad_preclip=42.30
+[E07] batch=040/153 pseudo=3 loss=6.9161 seg=0.7225 semseg=0.6350 mard=2.0839 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.924/0.912/0.946 wmean=1.000 grad_preclip=170.70
+[E07] batch=060/153 pseudo=4 loss=7.5623 seg=0.6458 semseg=0.2641 mard=2.0375 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.902/0.778/0.964 wmean=1.000 grad_preclip=123.21
+[E07] batch=080/153 pseudo=4 loss=9.1516 seg=0.5143 semseg=1.0294 mard=2.0613 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.902/0.850/0.952 wmean=1.000 grad_preclip=458.15
+[E07] batch=100/153 pseudo=3 loss=2.7790 seg=0.3364 semseg=0.1425 mard=2.0749 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.956/0.950/0.962 wmean=1.000 grad_preclip=24.19
+[E07] batch=120/153 pseudo=4 loss=5.2626 seg=0.3925 semseg=0.1582 mard=2.0837 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.872/0.857/0.901 wmean=1.000 grad_preclip=39.66
+[E07] batch=140/153 pseudo=1 loss=3.1447 seg=0.6728 semseg=0.4857 mard=2.0322 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.830/0.830/0.830 wmean=1.000 grad_preclip=31.88
+[E07] batch=153/153 pseudo=3 loss=16.1233 seg=1.1360 semseg=2.3435 mard=2.1322 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.890/0.824/0.942 wmean=1.000 grad_preclip=158.32
+
+[Epoch 07] DONE time=31.4s valid=153 skipped=0 pseudo=536 anchors=473 box_extra=86 mask_extra=63 reject_rel=23 loss=7.5081 seg=0.6710 semseg=0.6353 mard=2.0677 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1297.6 rel=0.876/0.661/0.968 wmean=1.000
+[E08] batch=001/153 pseudo=4 loss=4.3667 seg=0.3670 semseg=0.1691 mard=2.0730 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.901/0.880/0.924 wmean=1.000 grad_preclip=31.81
+[E08] batch=020/153 pseudo=2 loss=1.6311 seg=0.2696 semseg=0.0871 mard=2.0640 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.923/0.901/0.945 wmean=1.000 grad_preclip=14.64
+[E08] batch=040/153 pseudo=3 loss=3.6011 seg=0.4702 semseg=0.1363 mard=2.0217 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/768 fallback=0 rel=0.829/0.738/0.892 wmean=1.000 grad_preclip=21.70
+[E08] batch=060/153 pseudo=5 loss=9.2712 seg=0.6068 semseg=0.4063 mard=2.0271 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.829/0.695/0.943 wmean=1.000 grad_preclip=104.18
+[E08] batch=080/153 pseudo=3 loss=5.4242 seg=0.5680 semseg=0.3557 mard=2.0284 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.863/0.782/0.915 wmean=1.000 grad_preclip=51.41
+[E08] batch=100/153 pseudo=3 loss=16.3042 seg=1.7036 semseg=1.7540 mard=2.0995 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.843/0.712/0.946 wmean=1.000 grad_preclip=282.34
+[E08] batch=120/153 pseudo=4 loss=12.0349 seg=1.4596 semseg=0.6060 mard=2.0446 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.822/0.705/0.926 wmean=1.000 grad_preclip=938.48
+[E08] batch=140/153 pseudo=4 loss=4.6525 seg=0.3638 semseg=0.2077 mard=2.0507 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.907/0.813/0.958 wmean=1.000 grad_preclip=41.53
+[E08] batch=153/153 pseudo=5 loss=7.7511 seg=0.4376 semseg=0.5306 mard=2.0386 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.845/0.721/0.953 wmean=1.000 grad_preclip=101.93
+
+[Epoch 08] DONE time=31.4s valid=153 skipped=0 pseudo=531 anchors=475 box_extra=82 mask_extra=56 reject_rel=26 loss=7.4841 seg=0.7168 semseg=0.6031 mard=2.0689 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1277.5 rel=0.877/0.678/0.968 wmean=1.000
+[E09] batch=001/153 pseudo=3 loss=12.0191 seg=1.4454 semseg=1.3274 mard=2.0391 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.864/0.761/0.956 wmean=1.000 grad_preclip=158.98
+[E09] batch=020/153 pseudo=2 loss=2.4551 seg=0.4683 semseg=0.1527 mard=2.0572 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.829/0.820/0.837 wmean=1.000 grad_preclip=25.57
+[E09] batch=040/153 pseudo=4 loss=29.3212 seg=1.9868 semseg=3.6169 mard=2.0632 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.852/0.783/0.949 wmean=1.000 grad_preclip=266.30
+[E09] batch=060/153 pseudo=3 loss=5.6778 seg=0.6070 semseg=0.2227 mard=2.1085 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.806/0.728/0.903 wmean=1.000 grad_preclip=34.29
+[E09] batch=080/153 pseudo=3 loss=5.6802 seg=1.2418 semseg=0.2128 mard=2.0577 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.945/0.928/0.960 wmean=1.000 grad_preclip=72.67
+[E09] batch=100/153 pseudo=4 loss=7.3673 seg=0.6632 semseg=0.3480 mard=2.0244 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.921/0.903/0.934 wmean=1.000 grad_preclip=71.66
+[E09] batch=120/153 pseudo=3 loss=2.3710 seg=0.2518 semseg=0.0970 mard=2.1581 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.925/0.888/0.948 wmean=1.000 grad_preclip=24.07
+[E09] batch=140/153 pseudo=4 loss=6.8881 seg=0.3910 semseg=0.2167 mard=2.0499 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.856/0.821/0.887 wmean=1.000 grad_preclip=97.89
+[E09] batch=153/153 pseudo=4 loss=4.6757 seg=0.6165 semseg=0.1742 mard=2.0173 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.847/0.771/0.923 wmean=1.000 grad_preclip=51.35
+
+[Epoch 09] DONE time=31.5s valid=153 skipped=0 pseudo=534 anchors=469 box_extra=93 mask_extra=65 reject_rel=28 loss=7.3556 seg=0.6752 semseg=0.5985 mard=2.0669 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1287.5 rel=0.878/0.676/0.968 wmean=1.000
+[E10] batch=001/153 pseudo=4 loss=5.6210 seg=0.5337 semseg=0.2535 mard=2.0828 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.927/0.841/0.960 wmean=1.000 grad_preclip=44.61
+[E10] batch=020/153 pseudo=3 loss=4.1119 seg=0.4231 semseg=0.1998 mard=2.0333 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.886/0.787/0.956 wmean=1.000 grad_preclip=33.86
+[E10] batch=040/153 pseudo=4 loss=12.3692 seg=0.9782 semseg=1.2731 mard=2.0432 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.773/0.946 wmean=1.000 grad_preclip=77.72
+[E10] batch=060/153 pseudo=3 loss=6.3734 seg=0.3505 semseg=0.5404 mard=2.0786 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.884/0.794/0.953 wmean=1.000 grad_preclip=111.49
+[E10] batch=080/153 pseudo=2 loss=9.2344 seg=1.9138 semseg=0.9143 mard=2.0589 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.727/0.690/0.765 wmean=1.000 grad_preclip=132.92
+[E10] batch=100/153 pseudo=4 loss=16.6963 seg=0.9261 semseg=1.7979 mard=1.9973 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.817/0.719/0.878 wmean=1.000 grad_preclip=336.21
+[E10] batch=120/153 pseudo=4 loss=10.4802 seg=0.5383 semseg=1.2134 mard=2.0350 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.871/0.715/0.935 wmean=1.000 grad_preclip=187.20
+[E10] batch=140/153 pseudo=5 loss=11.6806 seg=1.2816 semseg=0.4701 mard=2.0310 lambda=0.000000 box_extra=3 mask_extra=3 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.816/0.753/0.872 wmean=1.000 grad_preclip=151.89
+[E10] batch=153/153 pseudo=2 loss=8.3704 seg=1.5150 semseg=1.3212 mard=2.0396 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.827/0.712/0.942 wmean=1.000 grad_preclip=159.67
+
+[Epoch 10] DONE time=31.7s valid=153 skipped=0 pseudo=539 anchors=473 box_extra=87 mask_extra=66 reject_rel=21 loss=7.6018 seg=0.6557 semseg=0.6517 mard=2.0605 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1307.6 rel=0.875/0.663/0.968 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_10.pt
+[E11] batch=001/153 pseudo=4 loss=4.8779 seg=0.3841 semseg=0.1500 mard=2.0229 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.882/0.787/0.951 wmean=1.000 grad_preclip=29.80
+[E11] batch=020/153 pseudo=4 loss=4.6944 seg=0.3728 semseg=0.1290 mard=2.0574 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.929/0.879/0.953 wmean=1.000 grad_preclip=37.47
+[E11] batch=040/153 pseudo=2 loss=7.2576 seg=1.1590 semseg=0.8988 mard=1.9968 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=16/0/768 fallback=0 rel=0.779/0.748/0.811 wmean=1.000 grad_preclip=135.01
+[E11] batch=060/153 pseudo=3 loss=8.3399 seg=1.2793 semseg=0.4699 mard=2.0972 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.838/0.691/0.953 wmean=1.000 grad_preclip=117.56
+[E11] batch=080/153 pseudo=3 loss=3.3428 seg=0.3505 semseg=0.1039 mard=2.0428 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.907/0.874/0.924 wmean=1.000 grad_preclip=30.24
+[E11] batch=100/153 pseudo=4 loss=6.2602 seg=0.4927 semseg=0.5170 mard=2.0791 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.856/0.786/0.914 wmean=1.000 grad_preclip=66.23
+[E11] batch=120/153 pseudo=3 loss=4.1882 seg=0.3549 semseg=0.1763 mard=2.0704 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.871/0.821/0.951 wmean=1.000 grad_preclip=29.65
+[E11] batch=140/153 pseudo=5 loss=5.7496 seg=0.5482 semseg=0.2070 mard=2.0886 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.865/0.705/0.946 wmean=1.000 grad_preclip=66.33
+[E11] batch=153/153 pseudo=4 loss=15.3529 seg=1.2696 semseg=1.8332 mard=2.0717 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.782/0.719/0.911 wmean=1.000 grad_preclip=270.94
+
+[Epoch 11] DONE time=31.5s valid=153 skipped=0 pseudo=529 anchors=469 box_extra=85 mask_extra=60 reject_rel=25 loss=6.7106 seg=0.5917 semseg=0.5612 mard=2.0705 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1285.0 rel=0.878/0.663/0.968 wmean=1.000
+[E12] batch=001/153 pseudo=3 loss=20.1971 seg=1.8211 semseg=2.6698 mard=2.0847 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.887/0.848/0.934 wmean=1.000 grad_preclip=735.13
+[E12] batch=020/153 pseudo=3 loss=5.7471 seg=0.5304 semseg=0.4836 mard=2.1062 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.859/0.730/0.947 wmean=1.000 grad_preclip=160.76
+[E12] batch=040/153 pseudo=4 loss=5.6234 seg=0.3768 semseg=0.2311 mard=2.1545 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.905/0.847/0.934 wmean=1.000 grad_preclip=105.23
+[E12] batch=060/153 pseudo=3 loss=9.6409 seg=0.8639 semseg=1.0390 mard=2.0357 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.834/0.681/0.914 wmean=1.000 grad_preclip=120.21
+[E12] batch=080/153 pseudo=4 loss=13.3477 seg=0.5777 semseg=1.7869 mard=2.0251 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.850/0.737/0.951 wmean=1.000 grad_preclip=345.74
+[E12] batch=100/153 pseudo=4 loss=5.3562 seg=0.5805 semseg=0.2746 mard=2.0735 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.936/0.902/0.958 wmean=1.000 grad_preclip=58.34
+[E12] batch=120/153 pseudo=4 loss=6.5890 seg=0.6056 semseg=0.2934 mard=2.0357 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.884/0.770/0.942 wmean=1.000 grad_preclip=138.78
+[E12] batch=140/153 pseudo=2 loss=1.8226 seg=0.3300 semseg=0.1194 mard=2.0603 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.927/0.907/0.946 wmean=1.000 grad_preclip=15.69
+[E12] batch=153/153 pseudo=3 loss=22.2474 seg=1.6781 semseg=1.3683 mard=1.9852 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.782/0.696/0.880 wmean=1.000 grad_preclip=480.27
+
+[Epoch 12] DONE time=31.4s valid=153 skipped=0 pseudo=536 anchors=479 box_extra=80 mask_extra=57 reject_rel=23 loss=6.7233 seg=0.6272 semseg=0.5348 mard=2.0673 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1300.1 rel=0.876/0.663/0.968 wmean=1.000
+[E13] batch=001/153 pseudo=4 loss=2.9477 seg=0.2323 semseg=0.0898 mard=2.0877 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.927/0.853/0.959 wmean=1.000 grad_preclip=29.38
+[E13] batch=020/153 pseudo=3 loss=4.9120 seg=0.5118 semseg=0.2347 mard=2.0910 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.882/0.833/0.909 wmean=1.000 grad_preclip=118.79
+[E13] batch=040/153 pseudo=4 loss=3.4208 seg=0.3171 semseg=0.1165 mard=2.0586 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.920/0.861/0.943 wmean=1.000 grad_preclip=33.08
+[E13] batch=060/153 pseudo=3 loss=1.8353 seg=0.2148 semseg=0.0736 mard=2.1289 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.944/0.939/0.949 wmean=1.000 grad_preclip=20.71
+[E13] batch=080/153 pseudo=3 loss=2.3375 seg=0.3135 semseg=0.1347 mard=2.0415 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.928/0.890/0.958 wmean=1.000 grad_preclip=23.57
+[E13] batch=100/153 pseudo=4 loss=3.3179 seg=0.3518 semseg=0.1269 mard=2.0741 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.925/0.889/0.946 wmean=1.000 grad_preclip=48.89
+[E13] batch=120/153 pseudo=3 loss=3.2129 seg=0.3514 semseg=0.1542 mard=2.0687 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.933/0.918/0.947 wmean=1.000 grad_preclip=36.45
+[E13] batch=140/153 pseudo=4 loss=4.6885 seg=0.3546 semseg=0.1967 mard=2.0490 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.875/0.802/0.952 wmean=1.000 grad_preclip=28.95
+[E13] batch=153/153 pseudo=4 loss=8.6066 seg=0.3994 semseg=0.8946 mard=2.0517 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.898/0.823/0.936 wmean=1.000 grad_preclip=52.37
+
+[Epoch 13] DONE time=31.4s valid=153 skipped=0 pseudo=532 anchors=472 box_extra=88 mask_extra=60 reject_rel=28 loss=6.0913 seg=0.5534 semseg=0.4234 mard=2.0653 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1282.5 rel=0.878/0.664/0.968 wmean=1.000
+[E14] batch=001/153 pseudo=2 loss=2.4453 seg=0.6858 semseg=0.2081 mard=2.1335 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.951/0.951/0.952 wmean=1.000 grad_preclip=45.03
+[E14] batch=020/153 pseudo=2 loss=4.8941 seg=1.5451 semseg=0.3363 mard=2.0958 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.941/0.936/0.947 wmean=1.000 grad_preclip=140.76
+[E14] batch=040/153 pseudo=4 loss=4.7730 seg=0.5533 semseg=0.1375 mard=2.0502 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.901/0.780/0.958 wmean=1.000 grad_preclip=66.26
+[E14] batch=060/153 pseudo=3 loss=5.7543 seg=0.9060 semseg=0.2793 mard=2.0376 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.793/0.738/0.857 wmean=1.000 grad_preclip=157.50
+[E14] batch=080/153 pseudo=3 loss=1.8839 seg=0.2328 semseg=0.0833 mard=2.0554 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.921/0.882/0.950 wmean=1.000 grad_preclip=23.50
+[E14] batch=100/153 pseudo=4 loss=4.5551 seg=0.3669 semseg=0.1394 mard=2.0950 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.892/0.755/0.950 wmean=1.000 grad_preclip=28.16
+[E14] batch=120/153 pseudo=4 loss=4.8563 seg=0.3618 semseg=0.3095 mard=2.0293 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.905/0.825/0.935 wmean=1.000 grad_preclip=93.44
+[E14] batch=140/153 pseudo=4 loss=3.6593 seg=0.3112 semseg=0.2239 mard=2.0340 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.851/0.801/0.948 wmean=1.000 grad_preclip=65.44
+[E14] batch=153/153 pseudo=4 loss=5.3972 seg=0.4058 semseg=0.2609 mard=2.0599 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.902/0.792/0.955 wmean=1.000 grad_preclip=43.16
+
+[Epoch 14] DONE time=31.7s valid=153 skipped=0 pseudo=536 anchors=473 box_extra=86 mask_extra=63 reject_rel=23 loss=6.3728 seg=0.5746 semseg=0.4699 mard=2.0709 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1295.1 rel=0.879/0.664/0.968 wmean=1.000
+[E15] batch=001/153 pseudo=4 loss=7.2871 seg=0.4793 semseg=0.2939 mard=2.1203 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.876/0.809/0.929 wmean=1.000 grad_preclip=105.00
+[E15] batch=020/153 pseudo=4 loss=7.0200 seg=0.7165 semseg=0.3299 mard=2.0343 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.925/0.892/0.954 wmean=1.000 grad_preclip=96.62
+[E15] batch=040/153 pseudo=5 loss=7.3445 seg=0.8757 semseg=0.2146 mard=2.0723 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.849/0.697/0.948 wmean=1.000 grad_preclip=83.79
+[E15] batch=060/153 pseudo=2 loss=1.7350 seg=0.3558 semseg=0.0801 mard=2.1126 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.917/0.880/0.955 wmean=1.000 grad_preclip=20.85
+[E15] batch=080/153 pseudo=4 loss=8.1899 seg=0.7758 semseg=0.3743 mard=2.0445 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.842/0.754/0.939 wmean=1.000 grad_preclip=84.88
+[E15] batch=100/153 pseudo=3 loss=4.8031 seg=0.5386 semseg=0.3520 mard=2.1457 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.934/0.917/0.945 wmean=1.000 grad_preclip=92.13
+[E15] batch=120/153 pseudo=4 loss=9.1668 seg=0.4969 semseg=1.2591 mard=2.0608 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.874/0.783/0.947 wmean=1.000 grad_preclip=286.31
+[E15] batch=140/153 pseudo=3 loss=2.8591 seg=0.2791 semseg=0.0984 mard=2.0822 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.945/0.925/0.959 wmean=1.000 grad_preclip=19.73
+[E15] batch=153/153 pseudo=2 loss=1.6911 seg=0.2559 semseg=0.0819 mard=2.0986 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.932/0.904/0.961 wmean=1.000 grad_preclip=14.68
+
+[Epoch 15] DONE time=31.7s valid=153 skipped=0 pseudo=538 anchors=480 box_extra=81 mask_extra=58 reject_rel=23 loss=6.3024 seg=0.5884 semseg=0.4573 mard=2.0713 lambda_avg=0.000000 FG/HBG/EBG=28.1/0.0/1295.1 rel=0.876/0.666/0.969 wmean=1.000
+[E16] batch=001/153 pseudo=3 loss=6.7750 seg=0.3447 semseg=0.7447 mard=2.0998 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.810/0.736/0.930 wmean=1.000 grad_preclip=149.13
+[E16] batch=020/153 pseudo=4 loss=4.5925 seg=0.3665 semseg=0.1746 mard=2.0657 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.869/0.750/0.945 wmean=1.000 grad_preclip=36.32
+[E16] batch=040/153 pseudo=3 loss=2.0310 seg=0.2177 semseg=0.0601 mard=2.0601 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.931/0.880/0.969 wmean=1.000 grad_preclip=22.32
+[E16] batch=060/153 pseudo=3 loss=5.2577 seg=0.7277 semseg=0.1713 mard=2.0332 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.892/0.821/0.947 wmean=1.000 grad_preclip=75.05
+[E16] batch=080/153 pseudo=2 loss=5.0636 seg=0.4110 semseg=1.1286 mard=2.0774 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.898/0.861/0.934 wmean=1.000 grad_preclip=231.08
+[E16] batch=100/153 pseudo=1 loss=0.7794 seg=0.3025 semseg=0.1172 mard=2.0634 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.945/0.945/0.945 wmean=1.000 grad_preclip=12.28
+[E16] batch=120/153 pseudo=2 loss=3.5604 seg=0.4820 semseg=0.3224 mard=2.0915 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.876/0.866/0.886 wmean=1.000 grad_preclip=40.86
+[E16] batch=140/153 pseudo=4 loss=17.3580 seg=1.3985 semseg=1.4372 mard=2.0299 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.801/0.740/0.874 wmean=1.000 grad_preclip=515.58
+[E16] batch=153/153 pseudo=3 loss=4.0535 seg=0.4066 semseg=0.1926 mard=2.0547 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.821/0.695/0.893 wmean=1.000 grad_preclip=57.14
+
+[Epoch 16] DONE time=31.7s valid=153 skipped=0 pseudo=532 anchors=474 box_extra=76 mask_extra=58 reject_rel=18 loss=6.6699 seg=0.5846 semseg=0.5356 mard=2.0649 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1290.0 rel=0.875/0.663/0.969 wmean=1.000
+[E17] batch=001/153 pseudo=3 loss=3.7419 seg=0.2626 semseg=0.1315 mard=2.0310 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.888/0.791/0.939 wmean=1.000 grad_preclip=34.47
+[E17] batch=020/153 pseudo=4 loss=5.8667 seg=0.5368 semseg=0.2323 mard=2.0870 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.859/0.682/0.953 wmean=1.000 grad_preclip=39.26
+[E17] batch=040/153 pseudo=3 loss=4.1536 seg=0.3891 semseg=0.1558 mard=2.1189 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.915/0.848/0.959 wmean=1.000 grad_preclip=40.08
+[E17] batch=060/153 pseudo=4 loss=5.9194 seg=0.5296 semseg=0.3142 mard=2.0635 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.853/0.799/0.932 wmean=1.000 grad_preclip=38.21
+[E17] batch=080/153 pseudo=3 loss=4.2901 seg=0.4349 semseg=0.2161 mard=2.1154 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.887/0.760/0.952 wmean=1.000 grad_preclip=31.44
+[E17] batch=100/153 pseudo=3 loss=5.3076 seg=0.6648 semseg=0.2122 mard=2.0489 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.933/0.902/0.957 wmean=1.000 grad_preclip=79.83
+[E17] batch=120/153 pseudo=4 loss=21.9902 seg=0.8168 semseg=2.2186 mard=2.0140 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.847/0.780/0.898 wmean=1.000 grad_preclip=297.49
+[E17] batch=140/153 pseudo=3 loss=4.3251 seg=0.4379 semseg=0.2265 mard=2.0570 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.868/0.810/0.921 wmean=1.000 grad_preclip=30.38
+[E17] batch=153/153 pseudo=3 loss=2.8328 seg=0.2182 semseg=0.1548 mard=2.1185 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.917/0.851/0.958 wmean=1.000 grad_preclip=394.66
+
+[Epoch 17] DONE time=31.3s valid=153 skipped=0 pseudo=527 anchors=470 box_extra=83 mask_extra=57 reject_rel=26 loss=6.4881 seg=0.5810 semseg=0.5484 mard=2.0701 lambda_avg=0.000000 FG/HBG/EBG=27.6/0.0/1277.5 rel=0.879/0.677/0.968 wmean=1.000
+[E18] batch=001/153 pseudo=3 loss=3.2732 seg=0.3549 semseg=0.1847 mard=2.0770 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.932/0.890/0.954 wmean=1.000 grad_preclip=40.37
+[E18] batch=020/153 pseudo=4 loss=8.4372 seg=0.6006 semseg=0.5385 mard=2.0581 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.813/0.951 wmean=1.000 grad_preclip=141.01
+[E18] batch=040/153 pseudo=3 loss=2.7388 seg=0.3126 semseg=0.1040 mard=2.0160 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.937/0.924/0.951 wmean=1.000 grad_preclip=33.89
+[E18] batch=060/153 pseudo=4 loss=6.4417 seg=0.3404 semseg=0.2306 mard=2.0391 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.867/0.776/0.935 wmean=1.000 grad_preclip=126.42
+[E18] batch=080/153 pseudo=4 loss=6.0340 seg=0.3609 semseg=0.2731 mard=2.0641 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.784/0.710/0.874 wmean=1.000 grad_preclip=41.00
+[E18] batch=100/153 pseudo=2 loss=8.2930 seg=1.7188 semseg=0.6674 mard=2.1628 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.813/0.747/0.879 wmean=1.000 grad_preclip=256.49
+[E18] batch=120/153 pseudo=3 loss=2.5926 seg=0.2336 semseg=0.1131 mard=2.0518 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.949/0.940/0.960 wmean=1.000 grad_preclip=27.56
+[E18] batch=140/153 pseudo=3 loss=2.8010 seg=0.2319 semseg=0.1126 mard=2.0758 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.909/0.880/0.951 wmean=1.000 grad_preclip=31.26
+[E18] batch=153/153 pseudo=2 loss=5.3722 seg=0.4129 semseg=1.1681 mard=2.0131 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.753/0.695/0.812 wmean=1.000 grad_preclip=117.96
+
+[Epoch 18] DONE time=31.7s valid=153 skipped=0 pseudo=543 anchors=479 box_extra=87 mask_extra=64 reject_rel=23 loss=6.4924 seg=0.5713 semseg=0.4768 mard=2.0660 lambda_avg=0.000000 FG/HBG/EBG=28.4/0.0/1312.6 rel=0.875/0.667/0.969 wmean=1.000
+[E19] batch=001/153 pseudo=4 loss=9.4913 seg=0.7055 semseg=0.6527 mard=2.0788 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.852/0.685/0.958 wmean=1.000 grad_preclip=98.09
+[E19] batch=020/153 pseudo=4 loss=4.5017 seg=0.3576 semseg=0.1525 mard=2.1181 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.863/0.703/0.939 wmean=1.000 grad_preclip=66.24
+[E19] batch=040/153 pseudo=3 loss=5.3267 seg=0.4393 semseg=0.1754 mard=2.0670 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.829/0.709/0.914 wmean=1.000 grad_preclip=71.63
+[E19] batch=060/153 pseudo=5 loss=9.4432 seg=0.5334 semseg=0.2966 mard=2.0371 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.818/0.667/0.942 wmean=1.000 grad_preclip=97.60
+[E19] batch=080/153 pseudo=4 loss=19.2624 seg=0.9822 semseg=1.5989 mard=2.0121 lambda=0.000000 box_extra=3 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.860/0.816/0.957 wmean=1.000 grad_preclip=247.00
+[E19] batch=100/153 pseudo=2 loss=4.4674 seg=0.4460 semseg=0.2939 mard=2.0444 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.838/0.816/0.859 wmean=1.000 grad_preclip=21.89
+[E19] batch=120/153 pseudo=2 loss=1.6207 seg=0.1982 semseg=0.0696 mard=2.0523 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.854/0.751/0.956 wmean=1.000 grad_preclip=18.73
+[E19] batch=140/153 pseudo=4 loss=4.2234 seg=0.3589 semseg=0.2090 mard=2.0926 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.932/0.927/0.940 wmean=1.000 grad_preclip=34.00
+[E19] batch=153/153 pseudo=5 loss=4.8293 seg=0.3138 semseg=0.2071 mard=2.0644 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.856/0.765/0.955 wmean=1.000 grad_preclip=32.06
+
+[Epoch 19] DONE time=31.6s valid=153 skipped=0 pseudo=533 anchors=476 box_extra=88 mask_extra=57 reject_rel=31 loss=6.3770 seg=0.5326 semseg=0.5261 mard=2.0694 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1287.5 rel=0.878/0.667/0.969 wmean=1.000
+[E20] batch=001/153 pseudo=4 loss=4.2390 seg=0.3583 semseg=0.1563 mard=2.0887 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.730/0.951 wmean=1.000 grad_preclip=27.98
+[E20] batch=020/153 pseudo=4 loss=3.0101 seg=0.2326 semseg=0.1307 mard=2.0449 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.724/0.944 wmean=1.000 grad_preclip=46.03
+[E20] batch=040/153 pseudo=3 loss=7.6599 seg=0.7534 semseg=0.5405 mard=2.0545 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.837/0.661/0.936 wmean=1.000 grad_preclip=107.74
+[E20] batch=060/153 pseudo=4 loss=3.1545 seg=0.2198 semseg=0.0951 mard=2.0830 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.760/0.953 wmean=1.000 grad_preclip=23.45
+[E20] batch=080/153 pseudo=4 loss=3.3751 seg=0.2564 semseg=0.1040 mard=2.0189 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.875/0.705/0.945 wmean=1.000 grad_preclip=28.52
+[E20] batch=100/153 pseudo=2 loss=1.4572 seg=0.1842 semseg=0.1027 mard=2.1125 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.956/0.952/0.961 wmean=1.000 grad_preclip=18.96
+[E20] batch=120/153 pseudo=3 loss=21.0745 seg=1.3646 semseg=7.7081 mard=2.0628 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/768 fallback=0 rel=0.876/0.802/0.932 wmean=1.000 grad_preclip=88.66
+[E20] batch=140/153 pseudo=2 loss=2.2657 seg=0.2177 semseg=0.1400 mard=2.0993 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.914/0.877/0.951 wmean=1.000 grad_preclip=33.48
+[E20] batch=153/153 pseudo=4 loss=8.7357 seg=0.3209 semseg=0.5532 mard=2.0412 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.872/0.727/0.963 wmean=1.000 grad_preclip=77.54
+
+[Epoch 20] DONE time=31.6s valid=153 skipped=0 pseudo=532 anchors=472 box_extra=86 mask_extra=60 reject_rel=26 loss=6.3367 seg=0.5534 semseg=0.5176 mard=2.0685 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1280.0 rel=0.879/0.661/0.968 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_20.pt
+[E21] batch=001/153 pseudo=3 loss=3.1324 seg=0.3284 semseg=0.1834 mard=2.1314 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.879/0.791/0.942 wmean=1.000 grad_preclip=61.45
+[E21] batch=020/153 pseudo=3 loss=3.6591 seg=0.3093 semseg=0.1430 mard=2.0721 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.857/0.704/0.953 wmean=1.000 grad_preclip=17.44
+[E21] batch=040/153 pseudo=4 loss=8.6461 seg=0.4515 semseg=0.8869 mard=2.0227 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.787/0.714/0.941 wmean=1.000 grad_preclip=96.74
+[E21] batch=060/153 pseudo=4 loss=3.6826 seg=0.2814 semseg=0.1175 mard=2.1599 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.941/0.930/0.953 wmean=1.000 grad_preclip=25.66
+[E21] batch=080/153 pseudo=5 loss=4.9700 seg=0.4105 semseg=0.1687 mard=2.0491 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.835/0.705/0.949 wmean=1.000 grad_preclip=27.37
+[E21] batch=100/153 pseudo=3 loss=7.6277 seg=0.7775 semseg=0.5660 mard=2.1434 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.811/0.739/0.931 wmean=1.000 grad_preclip=64.44
+[E21] batch=120/153 pseudo=4 loss=4.4660 seg=0.2642 semseg=0.1251 mard=2.0444 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.907/0.769/0.958 wmean=1.000 grad_preclip=33.68
+[E21] batch=140/153 pseudo=4 loss=6.8336 seg=0.4201 semseg=0.2029 mard=2.1328 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.857/0.733/0.959 wmean=1.000 grad_preclip=44.46
+[E21] batch=153/153 pseudo=4 loss=4.7102 seg=0.4371 semseg=0.1532 mard=2.0363 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.919/0.874/0.943 wmean=1.000 grad_preclip=78.43
+
+[Epoch 21] DONE time=31.6s valid=153 skipped=0 pseudo=534 anchors=477 box_extra=76 mask_extra=57 reject_rel=19 loss=6.0454 seg=0.5249 semseg=0.4508 mard=2.0688 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1285.0 rel=0.875/0.664/0.969 wmean=1.000
+[E22] batch=001/153 pseudo=3 loss=4.3849 seg=0.3238 semseg=0.7168 mard=2.0620 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/768 fallback=0 rel=0.886/0.786/0.952 wmean=1.000 grad_preclip=85.01
+[E22] batch=020/153 pseudo=4 loss=9.0514 seg=0.9362 semseg=0.4855 mard=2.0624 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.855/0.717/0.944 wmean=1.000 grad_preclip=43.32
+[E22] batch=040/153 pseudo=4 loss=14.3200 seg=1.4712 semseg=0.8248 mard=2.0472 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.891/0.847/0.937 wmean=1.000 grad_preclip=171.13
+[E22] batch=060/153 pseudo=4 loss=5.4942 seg=0.4753 semseg=0.2240 mard=2.0486 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.907/0.861/0.950 wmean=1.000 grad_preclip=40.41
+[E22] batch=080/153 pseudo=4 loss=3.0639 seg=0.2425 semseg=0.0901 mard=2.0440 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.939/0.919/0.953 wmean=1.000 grad_preclip=25.02
+[E22] batch=100/153 pseudo=4 loss=3.5299 seg=0.3385 semseg=0.1221 mard=2.1485 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.824/0.709/0.881 wmean=1.000 grad_preclip=21.40
+[E22] batch=120/153 pseudo=3 loss=4.0412 seg=0.4322 semseg=0.1204 mard=2.0078 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.871/0.829/0.929 wmean=1.000 grad_preclip=23.38
+[E22] batch=140/153 pseudo=3 loss=2.6648 seg=0.2821 semseg=0.1293 mard=2.0790 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.878/0.745/0.967 wmean=1.000 grad_preclip=43.08
+[E22] batch=153/153 pseudo=4 loss=7.3904 seg=0.6144 semseg=0.3535 mard=2.0745 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.861/0.792/0.933 wmean=1.000 grad_preclip=41.87
+
+[Epoch 22] DONE time=31.4s valid=153 skipped=0 pseudo=532 anchors=479 box_extra=77 mask_extra=53 reject_rel=24 loss=5.8845 seg=0.5582 semseg=0.4098 mard=2.0749 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1285.0 rel=0.878/0.669/0.968 wmean=1.000
+[E23] batch=001/153 pseudo=4 loss=5.4113 seg=0.3680 semseg=0.2446 mard=2.1065 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.914/0.879/0.945 wmean=1.000 grad_preclip=65.74
+[E23] batch=020/153 pseudo=2 loss=3.1306 seg=0.4596 semseg=0.2686 mard=2.1530 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.928/0.901/0.955 wmean=1.000 grad_preclip=42.51
+[E23] batch=040/153 pseudo=3 loss=5.8624 seg=0.7611 semseg=0.4135 mard=1.9919 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.880/0.749/0.950 wmean=1.000 grad_preclip=49.25
+[E23] batch=060/153 pseudo=4 loss=28.8582 seg=3.2376 semseg=1.8658 mard=2.0504 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.848/0.694/0.936 wmean=1.000 grad_preclip=174.51
+[E23] batch=080/153 pseudo=3 loss=5.3825 seg=0.4537 semseg=0.4238 mard=2.0576 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.838/0.719/0.956 wmean=1.000 grad_preclip=50.85
+[E23] batch=100/153 pseudo=4 loss=4.7715 seg=0.2751 semseg=0.1418 mard=2.0265 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.887/0.767/0.949 wmean=1.000 grad_preclip=34.88
+[E23] batch=120/153 pseudo=5 loss=10.1148 seg=0.6132 semseg=0.4959 mard=2.1123 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.841/0.753/0.969 wmean=1.000 grad_preclip=91.02
+[E23] batch=140/153 pseudo=4 loss=4.5012 seg=0.2185 semseg=0.1398 mard=2.0434 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.923/0.902/0.939 wmean=1.000 grad_preclip=52.54
+[E23] batch=153/153 pseudo=3 loss=3.5190 seg=0.2852 semseg=0.1613 mard=2.0688 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.849/0.768/0.955 wmean=1.000 grad_preclip=23.55
+
+[Epoch 23] DONE time=31.5s valid=153 skipped=0 pseudo=528 anchors=477 box_extra=75 mask_extra=51 reject_rel=24 loss=5.9197 seg=0.6261 semseg=0.4261 mard=2.0718 lambda_avg=0.000000 FG/HBG/EBG=27.6/0.0/1282.5 rel=0.881/0.659/0.969 wmean=1.000
+[E24] batch=001/153 pseudo=4 loss=5.3008 seg=0.4541 semseg=0.1787 mard=2.0521 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.903/0.858/0.927 wmean=1.000 grad_preclip=27.90
+[E24] batch=020/153 pseudo=4 loss=5.6960 seg=0.4223 semseg=0.1756 mard=2.0234 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.852/0.782/0.937 wmean=1.000 grad_preclip=60.19
+[E24] batch=040/153 pseudo=6 loss=9.3978 seg=0.6961 semseg=0.6472 mard=2.0820 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=48/0/1536 fallback=0 rel=0.807/0.686/0.959 wmean=1.000 grad_preclip=62.72
+[E24] batch=060/153 pseudo=4 loss=6.8883 seg=0.4660 semseg=0.3426 mard=2.0937 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.802/0.956 wmean=1.000 grad_preclip=90.26
+[E24] batch=080/153 pseudo=5 loss=11.3042 seg=0.7717 semseg=0.8091 mard=2.0666 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.853/0.745/0.936 wmean=1.000 grad_preclip=219.67
+[E24] batch=100/153 pseudo=3 loss=4.6561 seg=0.5391 semseg=0.2857 mard=2.0391 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.849/0.700/0.931 wmean=1.000 grad_preclip=38.43
+[E24] batch=120/153 pseudo=4 loss=7.7539 seg=0.6306 semseg=0.2403 mard=2.0920 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.835/0.758/0.959 wmean=1.000 grad_preclip=58.15
+[E24] batch=140/153 pseudo=3 loss=7.6463 seg=0.4240 semseg=1.0008 mard=2.0412 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.848/0.761/0.951 wmean=1.000 grad_preclip=68.67
+[E24] batch=153/153 pseudo=4 loss=5.8553 seg=0.4445 semseg=0.3290 mard=2.0848 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.853/0.712/0.949 wmean=1.000 grad_preclip=55.11
+
+[Epoch 24] DONE time=31.8s valid=153 skipped=0 pseudo=541 anchors=489 box_extra=66 mask_extra=52 reject_rel=14 loss=6.3643 seg=0.5294 semseg=0.5470 mard=2.0663 lambda_avg=0.000000 FG/HBG/EBG=28.3/0.0/1302.6 rel=0.877/0.659/0.968 wmean=1.000
+[E25] batch=001/153 pseudo=2 loss=2.9376 seg=0.3227 semseg=0.2282 mard=2.0976 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.914/0.905/0.923 wmean=1.000 grad_preclip=33.26
+[E25] batch=020/153 pseudo=2 loss=11.5561 seg=1.0836 semseg=2.3029 mard=2.0512 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.790/0.763/0.816 wmean=1.000 grad_preclip=367.20
+[E25] batch=040/153 pseudo=4 loss=6.7623 seg=0.4435 semseg=0.3691 mard=2.0475 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.901/0.880/0.928 wmean=1.000 grad_preclip=84.07
+[E25] batch=060/153 pseudo=4 loss=10.4598 seg=0.5466 semseg=2.3541 mard=2.0958 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.899/0.801/0.951 wmean=1.000 grad_preclip=152.29
+[E25] batch=080/153 pseudo=3 loss=1.9742 seg=0.2289 semseg=0.0962 mard=2.0750 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.934/0.886/0.961 wmean=1.000 grad_preclip=24.90
+[E25] batch=100/153 pseudo=3 loss=27.8098 seg=0.8754 semseg=6.2885 mard=2.0357 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.854/0.739/0.940 wmean=1.000 grad_preclip=517.63
+[E25] batch=120/153 pseudo=4 loss=5.1693 seg=0.8270 semseg=0.2341 mard=2.0601 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.858/0.804/0.885 wmean=1.000 grad_preclip=26.78
+[E25] batch=140/153 pseudo=3 loss=13.3979 seg=0.3762 semseg=3.0160 mard=2.0876 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.802/0.734/0.895 wmean=1.000 grad_preclip=103.48
+[E25] batch=153/153 pseudo=3 loss=2.7254 seg=0.2732 semseg=0.1972 mard=2.0839 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.944/0.932/0.953 wmean=1.000 grad_preclip=48.50
+
+[Epoch 25] DONE time=31.6s valid=153 skipped=0 pseudo=534 anchors=479 box_extra=77 mask_extra=55 reject_rel=22 loss=6.1413 seg=0.5386 semseg=0.4622 mard=2.0686 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1295.1 rel=0.879/0.670/0.969 wmean=1.000
+[E26] batch=001/153 pseudo=4 loss=6.8864 seg=0.3116 semseg=0.6865 mard=2.0932 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.820/0.683/0.871 wmean=1.000 grad_preclip=45.46
+[E26] batch=020/153 pseudo=3 loss=5.8113 seg=0.7537 semseg=0.2717 mard=2.0776 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.905/0.872/0.940 wmean=1.000 grad_preclip=118.58
+[E26] batch=040/153 pseudo=3 loss=6.0813 seg=0.6668 semseg=0.5718 mard=2.0802 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.817/0.782/0.885 wmean=1.000 grad_preclip=63.00
+[E26] batch=060/153 pseudo=2 loss=1.6422 seg=0.2158 semseg=0.0703 mard=2.0309 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.901/0.869/0.932 wmean=1.000 grad_preclip=12.78
+[E26] batch=080/153 pseudo=3 loss=5.9540 seg=0.6352 semseg=0.2557 mard=2.0471 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.840/0.743/0.927 wmean=1.000 grad_preclip=34.07
+[E26] batch=100/153 pseudo=1 loss=0.7484 seg=0.2370 semseg=0.1054 mard=2.1519 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.937/0.937/0.937 wmean=1.000 grad_preclip=10.36
+[E26] batch=120/153 pseudo=4 loss=8.2689 seg=0.5511 semseg=0.3723 mard=2.1381 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.857/0.762/0.951 wmean=1.000 grad_preclip=143.92
+[E26] batch=140/153 pseudo=4 loss=4.1324 seg=0.2742 semseg=0.1187 mard=2.0480 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.911/0.884/0.929 wmean=1.000 grad_preclip=54.14
+[E26] batch=153/153 pseudo=4 loss=10.4296 seg=0.8181 semseg=0.4186 mard=2.0951 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.886/0.825/0.946 wmean=1.000 grad_preclip=62.38
+
+[Epoch 26] DONE time=31.6s valid=153 skipped=0 pseudo=539 anchors=481 box_extra=83 mask_extra=58 reject_rel=25 loss=6.4336 seg=0.5618 semseg=0.5694 mard=2.0716 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1310.1 rel=0.879/0.658/0.969 wmean=1.000
+[E27] batch=001/153 pseudo=4 loss=11.4475 seg=0.5292 semseg=1.5737 mard=2.0377 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.916/0.863/0.952 wmean=1.000 grad_preclip=350.94
+[E27] batch=020/153 pseudo=4 loss=5.0332 seg=0.6058 semseg=0.1798 mard=2.0411 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.882/0.861/0.919 wmean=1.000 grad_preclip=83.04
+[E27] batch=040/153 pseudo=4 loss=2.9353 seg=0.3197 semseg=0.0993 mard=2.0875 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.950/0.946/0.954 wmean=1.000 grad_preclip=29.46
+[E27] batch=060/153 pseudo=3 loss=5.5461 seg=0.4695 semseg=0.3930 mard=2.0448 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.823/0.699/0.939 wmean=1.000 grad_preclip=22.20
+[E27] batch=080/153 pseudo=3 loss=3.2084 seg=0.3319 semseg=0.1819 mard=2.0645 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.892/0.870/0.927 wmean=1.000 grad_preclip=54.00
+[E27] batch=100/153 pseudo=3 loss=3.2618 seg=0.3416 semseg=0.1968 mard=2.0913 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.852/0.821/0.883 wmean=1.000 grad_preclip=41.69
+[E27] batch=120/153 pseudo=4 loss=5.6038 seg=0.3891 semseg=0.3735 mard=2.0320 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.929/0.901/0.957 wmean=1.000 grad_preclip=160.22
+[E27] batch=140/153 pseudo=4 loss=3.3058 seg=0.2906 semseg=0.1745 mard=2.0990 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.914/0.852/0.938 wmean=1.000 grad_preclip=55.06
+[E27] batch=153/153 pseudo=4 loss=2.9422 seg=0.4126 semseg=0.2275 mard=2.1036 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/768 fallback=0 rel=0.904/0.839/0.950 wmean=1.000 grad_preclip=28.58
+
+[Epoch 27] DONE time=31.2s valid=153 skipped=0 pseudo=526 anchors=474 box_extra=77 mask_extra=52 reject_rel=25 loss=5.5490 seg=0.5053 semseg=0.4086 mard=2.0765 lambda_avg=0.000000 FG/HBG/EBG=27.5/0.0/1272.5 rel=0.881/0.658/0.969 wmean=1.000
+[E28] batch=001/153 pseudo=4 loss=3.3811 seg=0.2548 semseg=0.1272 mard=2.0820 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.912/0.875/0.929 wmean=1.000 grad_preclip=24.43
+[E28] batch=020/153 pseudo=3 loss=2.4024 seg=0.2620 semseg=0.1284 mard=2.0862 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.911/0.862/0.955 wmean=1.000 grad_preclip=28.04
+[E28] batch=040/153 pseudo=2 loss=1.5325 seg=0.3347 semseg=0.0987 mard=2.0557 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.954/0.953/0.954 wmean=1.000 grad_preclip=17.14
+[E28] batch=060/153 pseudo=5 loss=3.6695 seg=0.2797 semseg=0.1064 mard=2.1124 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.857/0.703/0.957 wmean=1.000 grad_preclip=25.30
+[E28] batch=080/153 pseudo=4 loss=13.6337 seg=0.6152 semseg=1.0733 mard=2.1387 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.868/0.788/0.947 wmean=1.000 grad_preclip=156.95
+[E28] batch=100/153 pseudo=3 loss=4.1440 seg=0.2927 semseg=0.1119 mard=2.1000 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.886/0.792/0.934 wmean=1.000 grad_preclip=25.53
+[E28] batch=120/153 pseudo=2 loss=1.0644 seg=0.1360 semseg=0.0310 mard=2.1634 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.868/0.769/0.967 wmean=1.000 grad_preclip=14.09
+[E28] batch=140/153 pseudo=4 loss=3.0648 seg=0.2682 semseg=0.1556 mard=2.0868 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.940/0.929/0.957 wmean=1.000 grad_preclip=24.72
+[E28] batch=153/153 pseudo=3 loss=7.0232 seg=0.5084 semseg=0.6305 mard=2.0657 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.846/0.700/0.941 wmean=1.000 grad_preclip=32.39
+
+[Epoch 28] DONE time=31.5s valid=153 skipped=0 pseudo=530 anchors=482 box_extra=76 mask_extra=48 reject_rel=28 loss=5.9120 seg=0.5205 semseg=0.4460 mard=2.0698 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1282.5 rel=0.878/0.658/0.969 wmean=1.000
+[E29] batch=001/153 pseudo=4 loss=5.9661 seg=0.6691 semseg=0.2247 mard=2.0401 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.880/0.797/0.946 wmean=1.000 grad_preclip=44.49
+[E29] batch=020/153 pseudo=3 loss=2.4864 seg=0.2330 semseg=0.0790 mard=2.0569 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.930/0.923/0.939 wmean=1.000 grad_preclip=27.91
+[E29] batch=040/153 pseudo=5 loss=6.2512 seg=0.5368 semseg=0.3196 mard=2.0314 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.874/0.783/0.945 wmean=1.000 grad_preclip=55.77
+[E29] batch=060/153 pseudo=4 loss=3.4870 seg=0.2669 semseg=0.1111 mard=2.0917 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.892/0.743/0.946 wmean=1.000 grad_preclip=25.62
+[E29] batch=080/153 pseudo=4 loss=6.8547 seg=0.4264 semseg=0.2895 mard=2.0756 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.858/0.703/0.946 wmean=1.000 grad_preclip=68.35
+[E29] batch=100/153 pseudo=4 loss=2.8205 seg=0.2074 semseg=0.1098 mard=2.1407 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.905/0.851/0.948 wmean=1.000 grad_preclip=26.59
+[E29] batch=120/153 pseudo=3 loss=8.2945 seg=0.8532 semseg=1.0417 mard=2.0332 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.763/0.695/0.881 wmean=1.000 grad_preclip=144.11
+[E29] batch=140/153 pseudo=3 loss=6.5087 seg=0.5741 semseg=0.4397 mard=2.0543 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.853/0.773/0.943 wmean=1.000 grad_preclip=139.32
+[E29] batch=153/153 pseudo=3 loss=1.8855 seg=0.2028 semseg=0.0776 mard=2.0213 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.881/0.816/0.936 wmean=1.000 grad_preclip=17.15
+
+[Epoch 29] DONE time=31.8s valid=153 skipped=0 pseudo=540 anchors=490 box_extra=74 mask_extra=50 reject_rel=24 loss=5.8698 seg=0.4935 semseg=0.4834 mard=2.0669 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1297.6 rel=0.877/0.680/0.969 wmean=1.000
+[E30] batch=001/153 pseudo=4 loss=3.3826 seg=0.4950 semseg=0.1776 mard=2.0167 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.916/0.850/0.952 wmean=1.000 grad_preclip=23.27
+[E30] batch=020/153 pseudo=4 loss=6.6077 seg=0.5693 semseg=0.2414 mard=2.0651 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.882/0.701/0.952 wmean=1.000 grad_preclip=28.43
+[E30] batch=040/153 pseudo=4 loss=9.3767 seg=0.6709 semseg=0.7413 mard=2.0176 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.832/0.727/0.935 wmean=1.000 grad_preclip=198.31
+[E30] batch=060/153 pseudo=4 loss=28.0989 seg=3.1547 semseg=2.3661 mard=2.0555 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.770/0.673/0.923 wmean=1.000 grad_preclip=240.95
+[E30] batch=080/153 pseudo=4 loss=7.1414 seg=0.3845 semseg=0.7598 mard=2.0710 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.868/0.799/0.905 wmean=1.000 grad_preclip=198.32
+[E30] batch=100/153 pseudo=2 loss=1.4511 seg=0.2776 semseg=0.0847 mard=2.0629 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.922/0.888/0.956 wmean=1.000 grad_preclip=14.19
+[E30] batch=120/153 pseudo=4 loss=5.0351 seg=0.3454 semseg=0.2357 mard=2.0738 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.901/0.762/0.961 wmean=1.000 grad_preclip=26.70
+[E30] batch=140/153 pseudo=3 loss=2.8912 seg=0.3086 semseg=0.1651 mard=2.0817 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.911/0.858/0.946 wmean=1.000 grad_preclip=26.32
+[E30] batch=153/153 pseudo=4 loss=20.7076 seg=0.9346 semseg=3.0276 mard=2.1398 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.814/0.755/0.927 wmean=1.000 grad_preclip=135.53
+
+[Epoch 30] DONE time=31.5s valid=153 skipped=0 pseudo=530 anchors=466 box_extra=90 mask_extra=64 reject_rel=26 loss=5.9743 seg=0.5265 semseg=0.4613 mard=2.0717 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1292.5 rel=0.879/0.657/0.969 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_30.pt
+[E31] batch=001/153 pseudo=5 loss=5.4590 seg=0.3581 semseg=0.1303 mard=2.0474 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.875/0.780/0.933 wmean=1.000 grad_preclip=34.21
+[E31] batch=020/153 pseudo=4 loss=3.7651 seg=0.2444 semseg=0.2320 mard=2.0658 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.900/0.821/0.959 wmean=1.000 grad_preclip=50.79
+[E31] batch=040/153 pseudo=4 loss=3.4703 seg=0.3006 semseg=0.1189 mard=2.0510 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.924/0.847/0.964 wmean=1.000 grad_preclip=29.47
+[E31] batch=060/153 pseudo=4 loss=10.4173 seg=1.0227 semseg=0.3536 mard=2.0762 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.854/0.761/0.931 wmean=1.000 grad_preclip=223.51
+[E31] batch=080/153 pseudo=3 loss=5.0783 seg=0.4645 semseg=0.5204 mard=2.1089 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.907/0.828/0.952 wmean=1.000 grad_preclip=52.43
+[E31] batch=100/153 pseudo=2 loss=11.6339 seg=0.8072 semseg=2.2559 mard=2.0588 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.790/0.684/0.896 wmean=1.000 grad_preclip=82.01
+[E31] batch=120/153 pseudo=4 loss=8.1974 seg=0.6312 semseg=0.4056 mard=2.0422 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.812/0.723/0.939 wmean=1.000 grad_preclip=78.13
+[E31] batch=140/153 pseudo=4 loss=7.1250 seg=0.4402 semseg=0.5359 mard=2.0812 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.855/0.694/0.941 wmean=1.000 grad_preclip=202.33
+[E31] batch=153/153 pseudo=3 loss=4.7424 seg=0.4105 semseg=0.3025 mard=2.0226 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.880/0.863/0.910 wmean=1.000 grad_preclip=34.46
+
+[Epoch 31] DONE time=31.6s valid=153 skipped=0 pseudo=535 anchors=475 box_extra=83 mask_extra=60 reject_rel=23 loss=6.0996 seg=0.5082 semseg=0.5101 mard=2.0686 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1295.1 rel=0.880/0.674/0.969 wmean=1.000
+[E32] batch=001/153 pseudo=4 loss=3.7790 seg=0.4272 semseg=0.1042 mard=2.0683 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.896/0.823/0.947 wmean=1.000 grad_preclip=21.73
+[E32] batch=020/153 pseudo=4 loss=4.0755 seg=0.3766 semseg=0.1382 mard=2.0225 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.845/0.712/0.944 wmean=1.000 grad_preclip=25.52
+[E32] batch=040/153 pseudo=1 loss=11.5428 seg=1.0139 semseg=6.2199 mard=2.0656 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.697/0.697/0.697 wmean=1.000 grad_preclip=354.94
+[E32] batch=060/153 pseudo=3 loss=10.5066 seg=2.4206 semseg=0.5214 mard=2.0283 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/768 fallback=0 rel=0.747/0.679/0.830 wmean=1.000 grad_preclip=157.44
+[E32] batch=080/153 pseudo=3 loss=4.8675 seg=0.5238 semseg=0.2601 mard=2.1238 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.887/0.849/0.940 wmean=1.000 grad_preclip=74.48
+[E32] batch=100/153 pseudo=4 loss=4.3593 seg=0.3101 semseg=0.2958 mard=2.0293 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.875/0.777/0.936 wmean=1.000 grad_preclip=24.90
+[E32] batch=120/153 pseudo=3 loss=4.2293 seg=0.3348 semseg=0.1636 mard=2.0525 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.919/0.878/0.942 wmean=1.000 grad_preclip=57.27
+[E32] batch=140/153 pseudo=4 loss=4.0565 seg=0.3095 semseg=0.1399 mard=2.0809 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.701/0.946 wmean=1.000 grad_preclip=49.49
+[E32] batch=153/153 pseudo=4 loss=11.7042 seg=0.6404 semseg=1.0753 mard=2.0345 lambda=0.000000 box_extra=3 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.768/0.711/0.848 wmean=1.000 grad_preclip=421.70
+
+[Epoch 32] DONE time=31.4s valid=153 skipped=0 pseudo=534 anchors=475 box_extra=85 mask_extra=59 reject_rel=26 loss=5.5878 seg=0.4971 semseg=0.4413 mard=2.0646 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1290.0 rel=0.878/0.675/0.969 wmean=1.000
+[E33] batch=001/153 pseudo=4 loss=6.3952 seg=0.4928 semseg=0.2531 mard=2.1085 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.826/0.763/0.921 wmean=1.000 grad_preclip=39.84
+[E33] batch=020/153 pseudo=2 loss=2.7286 seg=0.4489 semseg=0.1887 mard=2.1385 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.931/0.913/0.949 wmean=1.000 grad_preclip=40.21
+[E33] batch=040/153 pseudo=4 loss=14.3750 seg=0.8031 semseg=1.6056 mard=2.1385 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.820/0.681/0.966 wmean=1.000 grad_preclip=382.24
+[E33] batch=060/153 pseudo=4 loss=4.1225 seg=0.4622 semseg=0.1510 mard=2.0652 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.907/0.869/0.946 wmean=1.000 grad_preclip=40.21
+[E33] batch=080/153 pseudo=4 loss=6.5898 seg=0.4382 semseg=1.1299 mard=2.0692 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.902/0.828/0.946 wmean=1.000 grad_preclip=84.40
+[E33] batch=100/153 pseudo=3 loss=6.4459 seg=0.8331 semseg=0.4110 mard=2.0604 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.834/0.734/0.908 wmean=1.000 grad_preclip=51.82
+[E33] batch=120/153 pseudo=3 loss=5.1480 seg=0.5790 semseg=0.4999 mard=2.0546 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.918/0.865/0.952 wmean=1.000 grad_preclip=43.96
+[E33] batch=140/153 pseudo=4 loss=8.7419 seg=0.6889 semseg=0.7444 mard=2.1408 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.893/0.776/0.943 wmean=1.000 grad_preclip=113.69
+[E33] batch=153/153 pseudo=5 loss=3.4883 seg=0.3775 semseg=0.1626 mard=2.0180 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=40/0/1152 fallback=0 rel=0.873/0.792/0.957 wmean=1.000 grad_preclip=37.86
+
+[Epoch 33] DONE time=31.7s valid=153 skipped=0 pseudo=538 anchors=478 box_extra=83 mask_extra=60 reject_rel=23 loss=5.7936 seg=0.5308 semseg=0.4390 mard=2.0662 lambda_avg=0.000000 FG/HBG/EBG=28.1/0.0/1307.6 rel=0.879/0.657/0.969 wmean=1.000
+[E34] batch=001/153 pseudo=4 loss=5.5030 seg=0.4334 semseg=0.2273 mard=2.0844 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.794/0.744/0.844 wmean=1.000 grad_preclip=32.13
+[E34] batch=020/153 pseudo=3 loss=2.5906 seg=0.2535 semseg=0.0960 mard=2.1221 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.936/0.917/0.948 wmean=1.000 grad_preclip=24.22
+[E34] batch=040/153 pseudo=3 loss=10.5722 seg=1.2289 semseg=0.6061 mard=2.0843 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.829/0.762/0.904 wmean=1.000 grad_preclip=89.71
+[E34] batch=060/153 pseudo=3 loss=4.2930 seg=0.3855 semseg=0.2299 mard=2.1234 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.940/0.928/0.947 wmean=1.000 grad_preclip=199.57
+[E34] batch=080/153 pseudo=4 loss=4.3551 seg=0.2693 semseg=0.1674 mard=2.0869 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.876/0.743/0.965 wmean=1.000 grad_preclip=66.72
+[E34] batch=100/153 pseudo=3 loss=9.3185 seg=0.8559 semseg=1.2382 mard=2.0473 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.752/0.712/0.792 wmean=1.000 grad_preclip=98.99
+[E34] batch=120/153 pseudo=4 loss=3.9507 seg=0.2317 semseg=0.1415 mard=2.0808 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.881/0.813/0.922 wmean=1.000 grad_preclip=33.03
+[E34] batch=140/153 pseudo=3 loss=1.8392 seg=0.2355 semseg=0.1137 mard=2.1747 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.934/0.918/0.946 wmean=1.000 grad_preclip=19.49
+[E34] batch=153/153 pseudo=3 loss=7.7725 seg=1.6226 semseg=1.1204 mard=2.0979 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=24/0/768 fallback=0 rel=0.836/0.765/0.933 wmean=1.000 grad_preclip=77.93
+
+[Epoch 34] DONE time=31.5s valid=153 skipped=0 pseudo=538 anchors=481 box_extra=74 mask_extra=57 reject_rel=17 loss=5.7538 seg=0.4986 semseg=0.4830 mard=2.0757 lambda_avg=0.000000 FG/HBG/EBG=28.1/0.0/1295.1 rel=0.877/0.676/0.969 wmean=1.000
+[E35] batch=001/153 pseudo=4 loss=9.6196 seg=0.3492 semseg=1.0214 mard=2.0695 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.835/0.692/0.937 wmean=1.000 grad_preclip=58.27
+[E35] batch=020/153 pseudo=2 loss=2.5214 seg=0.5245 semseg=0.2075 mard=2.0693 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.906/0.906/0.906 wmean=1.000 grad_preclip=33.63
+[E35] batch=040/153 pseudo=3 loss=14.6920 seg=1.9521 semseg=1.5354 mard=2.1184 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.837/0.779/0.940 wmean=1.000 grad_preclip=132.42
+[E35] batch=060/153 pseudo=4 loss=8.7138 seg=0.9493 semseg=0.4231 mard=2.0550 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.890/0.797/0.946 wmean=1.000 grad_preclip=91.44
+[E35] batch=080/153 pseudo=3 loss=3.0363 seg=0.2109 semseg=0.1590 mard=2.1142 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.915/0.855/0.958 wmean=1.000 grad_preclip=39.59
+[E35] batch=100/153 pseudo=2 loss=3.1846 seg=0.6617 semseg=0.3848 mard=2.0992 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.870/0.820/0.920 wmean=1.000 grad_preclip=17.21
+[E35] batch=120/153 pseudo=2 loss=3.2477 seg=0.3850 semseg=0.1847 mard=2.1102 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.856/0.757/0.956 wmean=1.000 grad_preclip=23.18
+[E35] batch=140/153 pseudo=4 loss=7.3218 seg=0.7704 semseg=0.2561 mard=2.0659 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.884/0.771/0.934 wmean=1.000 grad_preclip=92.49
+[E35] batch=153/153 pseudo=2 loss=2.2603 seg=0.4107 semseg=0.1857 mard=2.1156 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.893/0.868/0.917 wmean=1.000 grad_preclip=18.90
+
+[Epoch 35] DONE time=31.4s valid=153 skipped=0 pseudo=530 anchors=475 box_extra=82 mask_extra=55 reject_rel=27 loss=5.5801 seg=0.5123 semseg=0.4348 mard=2.0704 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1275.0 rel=0.880/0.679/0.969 wmean=1.000
+[E36] batch=001/153 pseudo=3 loss=9.0105 seg=0.8924 semseg=1.3246 mard=2.0867 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.843/0.736/0.932 wmean=1.000 grad_preclip=152.77
+[E36] batch=020/153 pseudo=4 loss=2.6802 seg=0.3428 semseg=0.1077 mard=2.0336 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.920/0.850/0.953 wmean=1.000 grad_preclip=15.20
+[E36] batch=040/153 pseudo=3 loss=2.2647 seg=0.2360 semseg=0.0801 mard=2.1164 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.925/0.906/0.939 wmean=1.000 grad_preclip=20.35
+[E36] batch=060/153 pseudo=4 loss=12.6601 seg=0.9522 semseg=1.7430 mard=2.0537 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.906/0.870/0.947 wmean=1.000 grad_preclip=100.14
+[E36] batch=080/153 pseudo=3 loss=2.7479 seg=0.2159 semseg=0.1410 mard=2.0335 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.855/0.762/0.950 wmean=1.000 grad_preclip=18.25
+[E36] batch=100/153 pseudo=4 loss=4.4407 seg=0.3792 semseg=0.2017 mard=2.0403 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.894/0.811/0.937 wmean=1.000 grad_preclip=23.50
+[E36] batch=120/153 pseudo=4 loss=3.3374 seg=0.1757 semseg=0.1786 mard=2.0826 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.932/0.900/0.964 wmean=1.000 grad_preclip=56.62
+[E36] batch=140/153 pseudo=4 loss=2.9116 seg=0.2120 semseg=0.0872 mard=2.0506 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.931/0.905/0.958 wmean=1.000 grad_preclip=28.22
+[E36] batch=153/153 pseudo=3 loss=4.8752 seg=0.4249 semseg=0.3163 mard=2.0790 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.876/0.840/0.898 wmean=1.000 grad_preclip=36.59
+
+[Epoch 36] DONE time=31.6s valid=153 skipped=0 pseudo=523 anchors=465 box_extra=88 mask_extra=58 reject_rel=30 loss=5.6017 seg=0.4967 semseg=0.4371 mard=2.0713 lambda_avg=0.000000 FG/HBG/EBG=27.3/0.0/1272.5 rel=0.882/0.656/0.969 wmean=1.000
+[E37] batch=001/153 pseudo=4 loss=4.8271 seg=0.3554 semseg=0.2439 mard=2.0437 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.871/0.704/0.952 wmean=1.000 grad_preclip=25.07
+[E37] batch=020/153 pseudo=5 loss=4.3437 seg=0.2143 semseg=0.1084 mard=2.0830 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.857/0.722/0.951 wmean=1.000 grad_preclip=27.57
+[E37] batch=040/153 pseudo=4 loss=7.8069 seg=0.6771 semseg=0.2984 mard=2.0640 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.785/0.702/0.885 wmean=1.000 grad_preclip=126.82
+[E37] batch=060/153 pseudo=4 loss=2.9586 seg=0.2512 semseg=0.1135 mard=2.0279 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.915/0.887/0.958 wmean=1.000 grad_preclip=23.92
+[E37] batch=080/153 pseudo=3 loss=5.3678 seg=0.4959 semseg=0.2496 mard=2.1500 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.916/0.868/0.950 wmean=1.000 grad_preclip=24.67
+[E37] batch=100/153 pseudo=4 loss=4.3211 seg=0.3496 semseg=0.1686 mard=2.0555 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.757/0.926 wmean=1.000 grad_preclip=31.48
+[E37] batch=120/153 pseudo=4 loss=3.7910 seg=0.2379 semseg=0.1128 mard=2.1086 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.920/0.848/0.964 wmean=1.000 grad_preclip=26.68
+[E37] batch=140/153 pseudo=4 loss=13.9139 seg=0.8932 semseg=1.8676 mard=2.0311 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.892/0.840/0.930 wmean=1.000 grad_preclip=248.40
+[E37] batch=153/153 pseudo=4 loss=4.6919 seg=0.4745 semseg=0.3147 mard=2.0453 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.806/0.707/0.893 wmean=1.000 grad_preclip=28.33
+
+[Epoch 37] DONE time=31.9s valid=153 skipped=0 pseudo=541 anchors=484 box_extra=82 mask_extra=57 reject_rel=25 loss=5.5874 seg=0.4966 semseg=0.3869 mard=2.0667 lambda_avg=0.000000 FG/HBG/EBG=28.3/0.0/1315.1 rel=0.879/0.670/0.969 wmean=1.000
+[E38] batch=001/153 pseudo=4 loss=5.6023 seg=0.3232 semseg=0.2172 mard=2.0571 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.913/0.866/0.951 wmean=1.000 grad_preclip=70.67
+[E38] batch=020/153 pseudo=4 loss=5.7843 seg=0.4471 semseg=0.4099 mard=2.1474 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.841/0.741/0.906 wmean=1.000 grad_preclip=79.65
+[E38] batch=040/153 pseudo=3 loss=2.4512 seg=0.3195 semseg=0.1142 mard=2.0558 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.877/0.799/0.951 wmean=1.000 grad_preclip=24.91
+[E38] batch=060/153 pseudo=3 loss=10.9311 seg=0.2197 semseg=2.0933 mard=2.0295 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.904/0.873/0.942 wmean=1.000 grad_preclip=62.92
+[E38] batch=080/153 pseudo=4 loss=9.9289 seg=0.3415 semseg=0.9826 mard=2.0492 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.892/0.840/0.947 wmean=1.000 grad_preclip=166.30
+[E38] batch=100/153 pseudo=3 loss=4.7003 seg=0.5728 semseg=0.2586 mard=2.0577 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.866/0.786/0.933 wmean=1.000 grad_preclip=44.21
+[E38] batch=120/153 pseudo=4 loss=5.4257 seg=0.5325 semseg=0.2382 mard=2.0825 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.801/0.710/0.944 wmean=1.000 grad_preclip=37.26
+[E38] batch=140/153 pseudo=3 loss=7.2787 seg=0.7505 semseg=0.3880 mard=2.0451 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.859/0.748/0.926 wmean=1.000 grad_preclip=72.31
+[E38] batch=153/153 pseudo=4 loss=2.2735 seg=0.1751 semseg=0.0699 mard=2.1091 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.942/0.900/0.959 wmean=1.000 grad_preclip=46.15
+
+[Epoch 38] DONE time=31.5s valid=153 skipped=0 pseudo=533 anchors=485 box_extra=76 mask_extra=48 reject_rel=28 loss=5.5867 seg=0.5165 semseg=0.4579 mard=2.0698 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1287.5 rel=0.880/0.657/0.969 wmean=1.000
+[E39] batch=001/153 pseudo=4 loss=7.7429 seg=0.6009 semseg=0.3373 mard=2.0496 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.864/0.780/0.941 wmean=1.000 grad_preclip=70.66
+[E39] batch=020/153 pseudo=5 loss=7.4222 seg=0.6036 semseg=0.2427 mard=2.0265 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.815/0.691/0.945 wmean=1.000 grad_preclip=51.93
+[E39] batch=040/153 pseudo=4 loss=4.3152 seg=0.3000 semseg=0.2228 mard=2.0566 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.868/0.735/0.951 wmean=1.000 grad_preclip=35.54
+[E39] batch=060/153 pseudo=3 loss=6.2878 seg=1.0572 semseg=0.3313 mard=2.0424 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.898/0.876/0.931 wmean=1.000 grad_preclip=55.35
+[E39] batch=080/153 pseudo=3 loss=2.7120 seg=0.2089 semseg=0.1828 mard=2.1042 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.913/0.845/0.959 wmean=1.000 grad_preclip=22.96
+[E39] batch=100/153 pseudo=4 loss=6.6387 seg=0.4023 semseg=0.2248 mard=2.0444 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.867/0.753/0.959 wmean=1.000 grad_preclip=56.22
+[E39] batch=120/153 pseudo=4 loss=3.8775 seg=0.2425 semseg=0.1087 mard=2.0555 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.908/0.879/0.929 wmean=1.000 grad_preclip=30.02
+[E39] batch=140/153 pseudo=5 loss=6.8717 seg=0.2812 semseg=0.9595 mard=2.0937 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.861/0.739/0.937 wmean=1.000 grad_preclip=126.21
+[E39] batch=153/153 pseudo=4 loss=6.1763 seg=0.5146 semseg=0.2290 mard=2.0950 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.859/0.753/0.952 wmean=1.000 grad_preclip=46.03
+
+[Epoch 39] DONE time=31.5s valid=153 skipped=0 pseudo=533 anchors=477 box_extra=80 mask_extra=56 reject_rel=24 loss=5.5049 seg=0.5043 semseg=0.3927 mard=2.0716 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1285.0 rel=0.880/0.657/0.969 wmean=1.000
+[E40] batch=001/153 pseudo=4 loss=5.1107 seg=0.3155 semseg=0.1760 mard=2.0446 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.848/0.758/0.947 wmean=1.000 grad_preclip=33.38
+[E40] batch=020/153 pseudo=3 loss=3.1514 seg=0.2801 semseg=0.1083 mard=2.1402 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.854/0.702/0.954 wmean=1.000 grad_preclip=20.46
+[E40] batch=040/153 pseudo=3 loss=3.5105 seg=0.3944 semseg=0.2526 mard=2.1515 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.893/0.808/0.937 wmean=1.000 grad_preclip=22.56
+[E40] batch=060/153 pseudo=2 loss=4.8631 seg=0.4412 semseg=0.3663 mard=2.0332 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.897/0.836/0.958 wmean=1.000 grad_preclip=33.20
+[E40] batch=080/153 pseudo=2 loss=2.4510 seg=0.4261 semseg=0.1616 mard=2.0774 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.887/0.841/0.934 wmean=1.000 grad_preclip=25.07
+[E40] batch=100/153 pseudo=4 loss=2.6962 seg=0.1647 semseg=0.0630 mard=2.1049 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.906/0.840/0.953 wmean=1.000 grad_preclip=26.63
+[E40] batch=120/153 pseudo=4 loss=4.8656 seg=0.4154 semseg=0.1571 mard=2.0583 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.921/0.867/0.940 wmean=1.000 grad_preclip=34.12
+[E40] batch=140/153 pseudo=3 loss=5.7448 seg=0.4999 semseg=0.4874 mard=2.0505 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.833/0.719/0.941 wmean=1.000 grad_preclip=53.82
+[E40] batch=153/153 pseudo=5 loss=9.6448 seg=0.4613 semseg=1.1624 mard=2.0794 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.934/0.884/0.960 wmean=1.000 grad_preclip=113.85
+
+[Epoch 40] DONE time=31.4s valid=153 skipped=0 pseudo=538 anchors=485 box_extra=75 mask_extra=53 reject_rel=22 loss=5.6845 seg=0.4863 semseg=0.4456 mard=2.0750 lambda_avg=0.000000 FG/HBG/EBG=28.1/0.0/1297.6 rel=0.882/0.683/0.969 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_40.pt
+[E41] batch=001/153 pseudo=4 loss=5.2929 seg=0.4489 semseg=0.3151 mard=2.1109 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.820/0.683/0.957 wmean=1.000 grad_preclip=52.51
+[E41] batch=020/153 pseudo=3 loss=4.3260 seg=0.5776 semseg=0.2613 mard=2.1170 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.888/0.778/0.952 wmean=1.000 grad_preclip=49.95
+[E41] batch=040/153 pseudo=3 loss=4.0273 seg=0.3997 semseg=0.1801 mard=2.0836 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.927/0.895/0.969 wmean=1.000 grad_preclip=45.15
+[E41] batch=060/153 pseudo=3 loss=6.1359 seg=0.7382 semseg=0.2730 mard=2.0896 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.868/0.804/0.926 wmean=1.000 grad_preclip=55.85
+[E41] batch=080/153 pseudo=4 loss=4.3348 seg=0.2292 semseg=0.3717 mard=2.0562 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.896/0.823/0.954 wmean=1.000 grad_preclip=65.33
+[E41] batch=100/153 pseudo=3 loss=2.3031 seg=0.2474 semseg=0.0835 mard=2.0871 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.943/0.913/0.968 wmean=1.000 grad_preclip=13.40
+[E41] batch=120/153 pseudo=5 loss=6.6394 seg=0.3977 semseg=0.5269 mard=2.1037 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.856/0.702/0.951 wmean=1.000 grad_preclip=47.11
+[E41] batch=140/153 pseudo=3 loss=3.2234 seg=0.3061 semseg=0.1859 mard=2.1191 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.921/0.880/0.951 wmean=1.000 grad_preclip=23.08
+[E41] batch=153/153 pseudo=4 loss=4.3265 seg=0.5220 semseg=0.2803 mard=2.1628 lambda=0.000000 box_extra=3 mask_extra=2 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.893/0.831/0.949 wmean=1.000 grad_preclip=43.63
+
+[Epoch 41] DONE time=31.6s valid=153 skipped=0 pseudo=525 anchors=471 box_extra=83 mask_extra=54 reject_rel=29 loss=5.7293 seg=0.5281 semseg=0.4519 mard=2.0744 lambda_avg=0.000000 FG/HBG/EBG=27.5/0.0/1280.0 rel=0.883/0.656/0.969 wmean=1.000
+[E42] batch=001/153 pseudo=2 loss=1.3784 seg=0.1868 semseg=0.1136 mard=2.1225 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.943/0.943/0.944 wmean=1.000 grad_preclip=20.46
+[E42] batch=020/153 pseudo=3 loss=2.7172 seg=0.2938 semseg=0.1455 mard=2.0724 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.929/0.918/0.935 wmean=1.000 grad_preclip=27.38
+[E42] batch=040/153 pseudo=1 loss=2.0080 seg=0.4764 semseg=0.2832 mard=2.0727 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.928/0.928/0.928 wmean=1.000 grad_preclip=14.31
+[E42] batch=060/153 pseudo=3 loss=1.8979 seg=0.2161 semseg=0.1384 mard=2.0608 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.939/0.932/0.953 wmean=1.000 grad_preclip=21.27
+[E42] batch=080/153 pseudo=3 loss=3.6274 seg=0.2850 semseg=0.2345 mard=2.0127 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.873/0.825/0.934 wmean=1.000 grad_preclip=24.60
+[E42] batch=100/153 pseudo=4 loss=3.8099 seg=0.2501 semseg=0.1261 mard=2.0845 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.867/0.744/0.961 wmean=1.000 grad_preclip=30.84
+[E42] batch=120/153 pseudo=4 loss=3.7730 seg=0.1943 semseg=0.1037 mard=2.0425 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.893/0.794/0.946 wmean=1.000 grad_preclip=43.65
+[E42] batch=140/153 pseudo=3 loss=2.0352 seg=0.1900 semseg=0.1417 mard=2.0616 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.930/0.881/0.959 wmean=1.000 grad_preclip=22.71
+[E42] batch=153/153 pseudo=4 loss=8.0978 seg=0.5259 semseg=0.2561 mard=2.1063 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.849/0.775/0.907 wmean=1.000 grad_preclip=48.42
+
+[Epoch 42] DONE time=31.5s valid=153 skipped=0 pseudo=533 anchors=475 box_extra=81 mask_extra=58 reject_rel=23 loss=5.4260 seg=0.4754 semseg=0.3945 mard=2.0647 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1295.1 rel=0.878/0.664/0.969 wmean=1.000
+[E43] batch=001/153 pseudo=3 loss=3.6089 seg=0.2645 semseg=0.1503 mard=2.1417 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.904/0.862/0.951 wmean=1.000 grad_preclip=25.25
+[E43] batch=020/153 pseudo=5 loss=13.7087 seg=0.9789 semseg=0.8547 mard=2.0322 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.779/0.690/0.876 wmean=1.000 grad_preclip=102.76
+[E43] batch=040/153 pseudo=2 loss=2.9751 seg=0.6920 semseg=0.2265 mard=2.0422 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.867/0.793/0.941 wmean=1.000 grad_preclip=17.12
+[E43] batch=060/153 pseudo=4 loss=3.8795 seg=0.2795 semseg=0.1299 mard=2.0554 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.892/0.802/0.941 wmean=1.000 grad_preclip=29.04
+[E43] batch=080/153 pseudo=5 loss=3.5484 seg=0.3195 semseg=0.1710 mard=2.0533 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.891/0.794/0.952 wmean=1.000 grad_preclip=29.61
+[E43] batch=100/153 pseudo=3 loss=3.0403 seg=0.2933 semseg=0.1302 mard=2.1156 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.908/0.804/0.964 wmean=1.000 grad_preclip=28.79
+[E43] batch=120/153 pseudo=4 loss=3.8428 seg=0.3224 semseg=0.1306 mard=2.0937 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.917/0.884/0.961 wmean=1.000 grad_preclip=22.06
+[E43] batch=140/153 pseudo=4 loss=4.7737 seg=0.4788 semseg=0.2407 mard=2.0548 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.908/0.839/0.946 wmean=1.000 grad_preclip=25.35
+[E43] batch=153/153 pseudo=4 loss=14.8095 seg=1.7430 semseg=0.7203 mard=2.0502 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.842/0.728/0.942 wmean=1.000 grad_preclip=188.09
+
+[Epoch 43] DONE time=31.5s valid=153 skipped=0 pseudo=529 anchors=481 box_extra=77 mask_extra=48 reject_rel=29 loss=5.1372 seg=0.4261 semseg=0.4140 mard=2.0712 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1277.5 rel=0.880/0.656/0.969 wmean=1.000
+[E44] batch=001/153 pseudo=4 loss=3.2929 seg=0.3331 semseg=0.1122 mard=2.1657 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.952/0.940/0.969 wmean=1.000 grad_preclip=19.60
+[E44] batch=020/153 pseudo=3 loss=3.4109 seg=0.4499 semseg=0.1535 mard=2.0453 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.943/0.931/0.953 wmean=1.000 grad_preclip=22.99
+[E44] batch=040/153 pseudo=4 loss=24.4338 seg=0.8548 semseg=3.4218 mard=2.1150 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.809/0.765/0.919 wmean=1.000 grad_preclip=201.51
+[E44] batch=060/153 pseudo=1 loss=0.8370 seg=0.1924 semseg=0.1718 mard=2.0643 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.952/0.952/0.952 wmean=1.000 grad_preclip=10.42
+[E44] batch=080/153 pseudo=3 loss=1.8209 seg=0.2370 semseg=0.0885 mard=2.0084 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.927/0.914/0.945 wmean=1.000 grad_preclip=23.94
+[E44] batch=100/153 pseudo=3 loss=7.2057 seg=0.9124 semseg=0.3447 mard=2.0390 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/768 fallback=0 rel=0.770/0.731/0.840 wmean=1.000 grad_preclip=69.85
+[E44] batch=120/153 pseudo=4 loss=3.7276 seg=0.2157 semseg=0.0961 mard=2.0546 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.909/0.871/0.951 wmean=1.000 grad_preclip=29.52
+[E44] batch=140/153 pseudo=3 loss=4.7031 seg=0.4553 semseg=0.2630 mard=2.0739 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.872/0.759/0.942 wmean=1.000 grad_preclip=29.13
+[E44] batch=153/153 pseudo=3 loss=2.1634 seg=0.2664 semseg=0.1019 mard=2.0624 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.880/0.771/0.940 wmean=1.000 grad_preclip=22.48
+
+[Epoch 44] DONE time=31.7s valid=153 skipped=0 pseudo=542 anchors=484 box_extra=79 mask_extra=58 reject_rel=21 loss=5.2391 seg=0.4593 semseg=0.3750 mard=2.0690 lambda_avg=0.000000 FG/HBG/EBG=28.3/0.0/1312.6 rel=0.880/0.656/0.969 wmean=1.000
+[E45] batch=001/153 pseudo=3 loss=5.7678 seg=0.6401 semseg=0.3485 mard=2.1369 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.894/0.850/0.965 wmean=1.000 grad_preclip=56.01
+[E45] batch=020/153 pseudo=3 loss=2.0603 seg=0.2179 semseg=0.0802 mard=2.1395 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.870/0.709/0.955 wmean=1.000 grad_preclip=25.50
+[E45] batch=040/153 pseudo=4 loss=18.3072 seg=0.8648 semseg=1.6455 mard=2.0850 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.906/0.825/0.940 wmean=1.000 grad_preclip=86.72
+[E45] batch=060/153 pseudo=2 loss=1.0795 seg=0.1637 semseg=0.0477 mard=2.1349 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.929/0.894/0.964 wmean=1.000 grad_preclip=15.30
+[E45] batch=080/153 pseudo=4 loss=2.8115 seg=0.1832 semseg=0.0782 mard=2.0604 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.922/0.861/0.955 wmean=1.000 grad_preclip=28.95
+[E45] batch=100/153 pseudo=2 loss=2.3276 seg=0.2676 semseg=0.1133 mard=2.0944 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.948/0.948/0.948 wmean=1.000 grad_preclip=57.32
+[E45] batch=120/153 pseudo=4 loss=6.5290 seg=0.4924 semseg=0.1608 mard=2.0911 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.848/0.785/0.941 wmean=1.000 grad_preclip=45.18
+[E45] batch=140/153 pseudo=4 loss=4.1942 seg=0.3560 semseg=0.1252 mard=2.0865 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.911/0.781/0.964 wmean=1.000 grad_preclip=22.27
+[E45] batch=153/153 pseudo=4 loss=23.6601 seg=1.7737 semseg=2.2875 mard=2.0343 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.843/0.731/0.948 wmean=1.000 grad_preclip=154.20
+
+[Epoch 45] DONE time=31.6s valid=153 skipped=0 pseudo=535 anchors=487 box_extra=76 mask_extra=48 reject_rel=28 loss=5.1000 seg=0.4750 semseg=0.3332 mard=2.0702 lambda_avg=0.000000 FG/HBG/EBG=28.0/0.0/1292.5 rel=0.881/0.656/0.969 wmean=1.000
+[E46] batch=001/153 pseudo=3 loss=1.7040 seg=0.2019 semseg=0.0794 mard=2.1409 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.902/0.826/0.948 wmean=1.000 grad_preclip=22.53
+[E46] batch=020/153 pseudo=4 loss=8.3617 seg=0.2939 semseg=0.3381 mard=2.0258 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.795/0.908 wmean=1.000 grad_preclip=34.84
+[E46] batch=040/153 pseudo=3 loss=2.9951 seg=0.3913 semseg=0.2633 mard=2.0466 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.931/0.880/0.961 wmean=1.000 grad_preclip=29.16
+[E46] batch=060/153 pseudo=2 loss=2.7403 seg=0.3571 semseg=0.2044 mard=2.0481 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.788/0.729/0.847 wmean=1.000 grad_preclip=17.82
+[E46] batch=080/153 pseudo=4 loss=7.9615 seg=0.5906 semseg=0.2430 mard=2.0369 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.827/0.757/0.886 wmean=1.000 grad_preclip=48.92
+[E46] batch=100/153 pseudo=4 loss=9.5953 seg=0.6205 semseg=0.6286 mard=2.0741 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.890/0.741/0.951 wmean=1.000 grad_preclip=35.31
+[E46] batch=120/153 pseudo=4 loss=4.6967 seg=0.4558 semseg=0.1427 mard=2.0425 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.909/0.885/0.937 wmean=1.000 grad_preclip=27.60
+[E46] batch=140/153 pseudo=2 loss=0.9947 seg=0.2002 semseg=0.0622 mard=2.0530 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.921/0.902/0.939 wmean=1.000 grad_preclip=15.36
+[E46] batch=153/153 pseudo=5 loss=3.6972 seg=0.3239 semseg=0.1469 mard=2.0485 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.899/0.832/0.951 wmean=1.000 grad_preclip=24.41
+
+[Epoch 46] DONE time=31.9s valid=153 skipped=0 pseudo=540 anchors=481 box_extra=76 mask_extra=59 reject_rel=17 loss=5.8687 seg=0.5160 semseg=0.4814 mard=2.0667 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1302.6 rel=0.879/0.663/0.970 wmean=1.000
+[E47] batch=001/153 pseudo=3 loss=2.2457 seg=0.2496 semseg=0.1152 mard=2.0438 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.869/0.747/0.951 wmean=1.000 grad_preclip=19.53
+[E47] batch=020/153 pseudo=4 loss=6.3874 seg=0.2543 semseg=0.6159 mard=2.0062 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.885/0.838/0.952 wmean=1.000 grad_preclip=73.63
+[E47] batch=040/153 pseudo=3 loss=7.7575 seg=1.0920 semseg=0.3915 mard=2.0761 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.916/0.854/0.953 wmean=1.000 grad_preclip=70.72
+[E47] batch=060/153 pseudo=4 loss=20.0091 seg=0.7240 semseg=4.9411 mard=2.0349 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.901/0.790/0.957 wmean=1.000 grad_preclip=42.45
+[E47] batch=080/153 pseudo=4 loss=3.4925 seg=0.3142 semseg=0.1486 mard=2.0821 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.862/0.763/0.946 wmean=1.000 grad_preclip=23.86
+[E47] batch=100/153 pseudo=3 loss=2.8246 seg=0.2086 semseg=0.0957 mard=2.1290 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.924/0.879/0.953 wmean=1.000 grad_preclip=30.03
+[E47] batch=120/153 pseudo=4 loss=3.5119 seg=0.4151 semseg=0.1379 mard=2.0373 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.844/0.781/0.944 wmean=1.000 grad_preclip=26.20
+[E47] batch=140/153 pseudo=4 loss=5.2031 seg=0.4619 semseg=0.2178 mard=2.1375 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.859/0.793/0.957 wmean=1.000 grad_preclip=36.09
+[E47] batch=153/153 pseudo=4 loss=9.1633 seg=0.6750 semseg=0.3108 mard=2.0658 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.873/0.755/0.948 wmean=1.000 grad_preclip=58.43
+
+[Epoch 47] DONE time=31.6s valid=153 skipped=0 pseudo=534 anchors=476 box_extra=84 mask_extra=58 reject_rel=26 loss=4.8121 seg=0.4434 semseg=0.3363 mard=2.0683 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1285.0 rel=0.880/0.677/0.970 wmean=1.000
+[E48] batch=001/153 pseudo=1 loss=0.8791 seg=0.3081 semseg=0.1266 mard=2.0897 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.940/0.940/0.940 wmean=1.000 grad_preclip=13.04
+[E48] batch=020/153 pseudo=2 loss=1.1543 seg=0.1722 semseg=0.0678 mard=2.0711 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.873/0.835/0.911 wmean=1.000 grad_preclip=15.53
+[E48] batch=040/153 pseudo=4 loss=17.8234 seg=1.2252 semseg=2.3793 mard=2.0654 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.916/0.844/0.950 wmean=1.000 grad_preclip=148.25
+[E48] batch=060/153 pseudo=4 loss=3.9077 seg=0.2824 semseg=0.1681 mard=2.0557 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.927/0.868/0.948 wmean=1.000 grad_preclip=27.73
+[E48] batch=080/153 pseudo=4 loss=3.6987 seg=0.2515 semseg=0.1211 mard=2.0433 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.818/0.742/0.880 wmean=1.000 grad_preclip=32.02
+[E48] batch=100/153 pseudo=2 loss=2.1905 seg=0.3843 semseg=0.1373 mard=2.0646 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.832/0.763/0.902 wmean=1.000 grad_preclip=18.59
+[E48] batch=120/153 pseudo=3 loss=6.3365 seg=0.5882 semseg=0.6429 mard=2.0881 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.821/0.713/0.949 wmean=1.000 grad_preclip=211.46
+[E48] batch=140/153 pseudo=3 loss=5.2702 seg=0.6575 semseg=0.4059 mard=2.0484 lambda=0.000000 box_extra=3 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.818/0.760/0.886 wmean=1.000 grad_preclip=57.29
+[E48] batch=153/153 pseudo=3 loss=1.7880 seg=0.1762 semseg=0.0763 mard=2.0856 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.943/0.924/0.958 wmean=1.000 grad_preclip=21.26
+
+[Epoch 48] DONE time=31.7s valid=153 skipped=0 pseudo=532 anchors=479 box_extra=75 mask_extra=53 reject_rel=22 loss=5.3661 seg=0.4867 semseg=0.4037 mard=2.0705 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1290.0 rel=0.882/0.664/0.970 wmean=1.000
+[E49] batch=001/153 pseudo=1 loss=0.9867 seg=0.3183 semseg=0.1507 mard=2.0712 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.949/0.949/0.949 wmean=1.000 grad_preclip=10.72
+[E49] batch=020/153 pseudo=4 loss=6.5018 seg=0.5115 semseg=0.3607 mard=2.0604 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.832/0.727/0.966 wmean=1.000 grad_preclip=63.59
+[E49] batch=040/153 pseudo=3 loss=6.1505 seg=0.4685 semseg=0.7091 mard=2.1705 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.893/0.800/0.941 wmean=1.000 grad_preclip=54.91
+[E49] batch=060/153 pseudo=3 loss=3.3317 seg=0.3855 semseg=0.0890 mard=2.0498 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.904/0.832/0.957 wmean=1.000 grad_preclip=22.30
+[E49] batch=080/153 pseudo=2 loss=1.2246 seg=0.1289 semseg=0.1264 mard=2.0892 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.926/0.887/0.965 wmean=1.000 grad_preclip=18.06
+[E49] batch=100/153 pseudo=4 loss=7.3246 seg=0.5627 semseg=0.6217 mard=2.1419 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.778/0.683/0.951 wmean=1.000 grad_preclip=44.56
+[E49] batch=120/153 pseudo=3 loss=2.7629 seg=0.3691 semseg=0.1554 mard=2.1124 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.942/0.927/0.958 wmean=1.000 grad_preclip=20.53
+[E49] batch=140/153 pseudo=3 loss=5.2049 seg=0.4346 semseg=0.2699 mard=2.0175 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.842/0.754/0.935 wmean=1.000 grad_preclip=24.92
+[E49] batch=153/153 pseudo=3 loss=9.3281 seg=0.9954 semseg=0.9518 mard=2.1116 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.829/0.724/0.916 wmean=1.000 grad_preclip=36.66
+
+[Epoch 49] DONE time=31.6s valid=153 skipped=0 pseudo=540 anchors=488 box_extra=76 mask_extra=52 reject_rel=24 loss=5.5240 seg=0.4846 semseg=0.4190 mard=2.0709 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1305.1 rel=0.878/0.656/0.969 wmean=1.000
+[E50] batch=001/153 pseudo=3 loss=1.6836 seg=0.1340 semseg=0.0507 mard=2.1739 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.845/0.702/0.951 wmean=1.000 grad_preclip=22.83
+[E50] batch=020/153 pseudo=2 loss=4.5052 seg=0.3924 semseg=0.6302 mard=2.0353 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.845/0.833/0.856 wmean=1.000 grad_preclip=42.17
+[E50] batch=040/153 pseudo=3 loss=5.4193 seg=0.5746 semseg=0.4478 mard=2.0536 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.859/0.766/0.953 wmean=1.000 grad_preclip=27.12
+[E50] batch=060/153 pseudo=5 loss=12.4460 seg=1.0918 semseg=0.3328 mard=2.0678 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.834/0.766/0.946 wmean=1.000 grad_preclip=64.32
+[E50] batch=080/153 pseudo=3 loss=2.4896 seg=0.2173 semseg=0.1571 mard=2.0744 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.895/0.790/0.954 wmean=1.000 grad_preclip=22.41
+[E50] batch=100/153 pseudo=3 loss=7.1965 seg=1.0116 semseg=0.5075 mard=2.0651 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.825/0.766/0.927 wmean=1.000 grad_preclip=34.22
+[E50] batch=120/153 pseudo=3 loss=9.5709 seg=1.0624 semseg=0.7799 mard=2.1137 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.740/0.656/0.820 wmean=1.000 grad_preclip=73.51
+[E50] batch=140/153 pseudo=5 loss=7.4203 seg=0.3686 semseg=0.7917 mard=2.0719 lambda=0.000000 box_extra=3 mask_extra=2 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.859/0.760/0.952 wmean=1.000 grad_preclip=91.11
+[E50] batch=153/153 pseudo=4 loss=6.9059 seg=0.6817 semseg=0.3365 mard=2.0528 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.932/0.913/0.941 wmean=1.000 grad_preclip=30.48
+
+[Epoch 50] DONE time=31.6s valid=153 skipped=0 pseudo=541 anchors=480 box_extra=83 mask_extra=61 reject_rel=22 loss=5.3671 seg=0.4748 semseg=0.3999 mard=2.0746 lambda_avg=0.000000 FG/HBG/EBG=28.3/0.0/1300.1 rel=0.879/0.656/0.970 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_50.pt
+[E51] batch=001/153 pseudo=4 loss=6.0113 seg=0.6505 semseg=0.3055 mard=2.0708 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.890/0.816/0.930 wmean=1.000 grad_preclip=30.75
+[E51] batch=020/153 pseudo=1 loss=2.6550 seg=0.7213 semseg=0.6926 mard=2.0244 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.791/0.791/0.791 wmean=1.000 grad_preclip=14.16
+[E51] batch=040/153 pseudo=2 loss=3.1825 seg=0.4671 semseg=0.1981 mard=2.0159 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.837/0.748/0.925 wmean=1.000 grad_preclip=18.98
+[E51] batch=060/153 pseudo=4 loss=9.9517 seg=0.8242 semseg=0.5075 mard=2.0499 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.874/0.766/0.945 wmean=1.000 grad_preclip=84.36
+[E51] batch=080/153 pseudo=4 loss=8.7642 seg=0.3916 semseg=0.9127 mard=2.0473 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.770/0.699/0.893 wmean=1.000 grad_preclip=55.08
+[E51] batch=100/153 pseudo=2 loss=1.7998 seg=0.1839 semseg=0.1583 mard=2.0398 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.924/0.894/0.954 wmean=1.000 grad_preclip=16.99
+[E51] batch=120/153 pseudo=4 loss=4.0875 seg=0.2212 semseg=0.0899 mard=2.0303 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.935/0.881/0.959 wmean=1.000 grad_preclip=73.34
+[E51] batch=140/153 pseudo=4 loss=3.5899 seg=0.2915 semseg=0.1172 mard=2.0604 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.894/0.853/0.941 wmean=1.000 grad_preclip=36.58
+[E51] batch=153/153 pseudo=4 loss=4.3294 seg=0.2786 semseg=0.1773 mard=2.1052 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.894/0.737/0.957 wmean=1.000 grad_preclip=34.85
+
+[Epoch 51] DONE time=31.6s valid=153 skipped=0 pseudo=542 anchors=480 box_extra=84 mask_extra=62 reject_rel=22 loss=5.2172 seg=0.4603 semseg=0.3458 mard=2.0645 lambda_avg=0.000000 FG/HBG/EBG=28.3/0.0/1310.1 rel=0.881/0.669/0.970 wmean=1.000
+[E52] batch=001/153 pseudo=2 loss=2.8202 seg=0.5245 semseg=0.3509 mard=2.1110 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.904/0.850/0.958 wmean=1.000 grad_preclip=29.35
+[E52] batch=020/153 pseudo=4 loss=5.5576 seg=0.2841 semseg=0.4067 mard=2.0487 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.906/0.796/0.967 wmean=1.000 grad_preclip=64.74
+[E52] batch=040/153 pseudo=3 loss=2.7571 seg=0.2301 semseg=0.0887 mard=2.1498 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.838/0.774/0.940 wmean=1.000 grad_preclip=28.35
+[E52] batch=060/153 pseudo=4 loss=3.3873 seg=0.1821 semseg=0.1515 mard=2.0576 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.877/0.754/0.936 wmean=1.000 grad_preclip=30.95
+[E52] batch=080/153 pseudo=4 loss=3.0914 seg=0.3006 semseg=0.1171 mard=2.1559 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.910/0.864/0.935 wmean=1.000 grad_preclip=22.33
+[E52] batch=100/153 pseudo=4 loss=5.6191 seg=0.4279 semseg=0.2597 mard=2.0961 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.865/0.737/0.956 wmean=1.000 grad_preclip=45.58
+[E52] batch=120/153 pseudo=2 loss=3.2333 seg=0.4195 semseg=0.4833 mard=2.0601 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.840/0.783/0.896 wmean=1.000 grad_preclip=52.87
+[E52] batch=140/153 pseudo=4 loss=27.7822 seg=1.2760 semseg=3.8511 mard=2.0829 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.902/0.821/0.956 wmean=1.000 grad_preclip=121.21
+[E52] batch=153/153 pseudo=3 loss=6.8136 seg=0.4953 semseg=0.4460 mard=2.0635 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.846/0.766/0.943 wmean=1.000 grad_preclip=47.98
+
+[Epoch 52] DONE time=31.6s valid=153 skipped=0 pseudo=529 anchors=478 box_extra=74 mask_extra=51 reject_rel=23 loss=4.8833 seg=0.4596 semseg=0.3299 mard=2.0693 lambda_avg=0.000000 FG/HBG/EBG=27.7/0.0/1280.0 rel=0.883/0.664/0.969 wmean=1.000
+[E53] batch=001/153 pseudo=4 loss=4.4350 seg=0.3443 semseg=0.1541 mard=2.0649 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.893/0.818/0.940 wmean=1.000 grad_preclip=31.45
+[E53] batch=020/153 pseudo=4 loss=9.4191 seg=0.5396 semseg=0.9275 mard=2.0147 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.894/0.795/0.936 wmean=1.000 grad_preclip=68.50
+[E53] batch=040/153 pseudo=2 loss=2.3386 seg=0.2548 semseg=0.1153 mard=2.1489 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.841/0.788/0.895 wmean=1.000 grad_preclip=16.61
+[E53] batch=060/153 pseudo=4 loss=2.9333 seg=0.1973 semseg=0.1790 mard=2.0520 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.852/0.787/0.896 wmean=1.000 grad_preclip=22.52
+[E53] batch=080/153 pseudo=3 loss=4.5383 seg=0.3534 semseg=0.2565 mard=2.1192 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.874/0.778/0.930 wmean=1.000 grad_preclip=32.17
+[E53] batch=100/153 pseudo=4 loss=2.3382 seg=0.1750 semseg=0.0646 mard=2.0164 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.927/0.906/0.938 wmean=1.000 grad_preclip=23.94
+[E53] batch=120/153 pseudo=4 loss=5.9207 seg=0.4330 semseg=0.2882 mard=2.0424 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.802/0.717/0.949 wmean=1.000 grad_preclip=72.68
+[E53] batch=140/153 pseudo=3 loss=8.5138 seg=0.8039 semseg=1.3149 mard=2.0699 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.873/0.703/0.963 wmean=1.000 grad_preclip=52.98
+[E53] batch=153/153 pseudo=3 loss=3.2577 seg=0.3113 semseg=0.1423 mard=2.1096 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.895/0.815/0.944 wmean=1.000 grad_preclip=22.05
+
+[Epoch 53] DONE time=31.7s valid=153 skipped=0 pseudo=540 anchors=485 box_extra=79 mask_extra=55 reject_rel=24 loss=5.3200 seg=0.4809 semseg=0.4136 mard=2.0654 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1310.1 rel=0.880/0.656/0.970 wmean=1.000
+[E54] batch=001/153 pseudo=4 loss=3.6849 seg=0.3226 semseg=0.1184 mard=2.0462 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.925/0.885/0.956 wmean=1.000 grad_preclip=23.56
+[E54] batch=020/153 pseudo=4 loss=5.4935 seg=0.3410 semseg=0.3384 mard=2.0211 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.893/0.801/0.954 wmean=1.000 grad_preclip=79.83
+[E54] batch=040/153 pseudo=1 loss=3.6480 seg=2.4588 semseg=0.3234 mard=2.1084 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.742/0.742/0.742 wmean=1.000 grad_preclip=13.13
+[E54] batch=060/153 pseudo=4 loss=5.0414 seg=0.5433 semseg=0.2645 mard=2.0437 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.856/0.746/0.940 wmean=1.000 grad_preclip=32.78
+[E54] batch=080/153 pseudo=3 loss=2.2705 seg=0.2235 semseg=0.1256 mard=2.0881 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.925/0.902/0.945 wmean=1.000 grad_preclip=23.42
+[E54] batch=100/153 pseudo=3 loss=3.3589 seg=0.4562 semseg=0.1574 mard=2.0075 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.929/0.923/0.939 wmean=1.000 grad_preclip=22.02
+[E54] batch=120/153 pseudo=4 loss=12.8823 seg=0.5983 semseg=1.6982 mard=2.0529 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.842/0.683/0.969 wmean=1.000 grad_preclip=130.70
+[E54] batch=140/153 pseudo=2 loss=0.6768 seg=0.1039 semseg=0.0465 mard=2.0778 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.947/0.932/0.962 wmean=1.000 grad_preclip=15.82
+[E54] batch=153/153 pseudo=4 loss=2.7073 seg=0.2948 semseg=0.0922 mard=2.0279 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.917/0.883/0.948 wmean=1.000 grad_preclip=25.22
+
+[Epoch 54] DONE time=31.5s valid=153 skipped=0 pseudo=534 anchors=481 box_extra=78 mask_extra=53 reject_rel=25 loss=5.1371 seg=0.5115 semseg=0.3615 mard=2.0664 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1302.6 rel=0.884/0.665/0.970 wmean=1.000
+[E55] batch=001/153 pseudo=4 loss=31.4662 seg=1.8610 semseg=3.9974 mard=2.0521 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.872/0.790/0.947 wmean=1.000 grad_preclip=69.47
+[E55] batch=020/153 pseudo=4 loss=3.0526 seg=0.2510 semseg=0.1530 mard=2.0563 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.884/0.824/0.947 wmean=1.000 grad_preclip=32.27
+[E55] batch=040/153 pseudo=4 loss=5.5565 seg=0.3079 semseg=0.3831 mard=2.0697 lambda=0.000000 box_extra=2 mask_extra=2 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.914/0.886/0.953 wmean=1.000 grad_preclip=37.04
+[E55] batch=060/153 pseudo=1 loss=2.9914 seg=1.2064 semseg=0.6161 mard=2.0603 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=8/0/384 fallback=0 rel=0.819/0.819/0.819 wmean=1.000 grad_preclip=14.05
+[E55] batch=080/153 pseudo=4 loss=3.9109 seg=0.2430 semseg=0.2213 mard=2.0427 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.874/0.796/0.945 wmean=1.000 grad_preclip=34.16
+[E55] batch=100/153 pseudo=2 loss=4.0247 seg=0.6483 semseg=0.4779 mard=2.0030 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.903/0.861/0.945 wmean=1.000 grad_preclip=46.25
+[E55] batch=120/153 pseudo=3 loss=2.7562 seg=0.3010 semseg=0.1094 mard=2.1012 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.877/0.764/0.939 wmean=1.000 grad_preclip=23.79
+[E55] batch=140/153 pseudo=4 loss=4.4939 seg=0.3613 semseg=0.1502 mard=2.0457 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.875/0.742/0.937 wmean=1.000 grad_preclip=80.61
+[E55] batch=153/153 pseudo=4 loss=4.9263 seg=0.4674 semseg=0.3730 mard=2.0482 lambda=0.000000 box_extra=2 mask_extra=1 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.800/0.697/0.925 wmean=1.000 grad_preclip=29.90
+
+[Epoch 55] DONE time=31.6s valid=153 skipped=0 pseudo=527 anchors=473 box_extra=81 mask_extra=54 reject_rel=27 loss=5.2579 seg=0.5154 semseg=0.4167 mard=2.0679 lambda_avg=0.000000 FG/HBG/EBG=27.6/0.0/1277.5 rel=0.882/0.656/0.970 wmean=1.000
+[E56] batch=001/153 pseudo=4 loss=6.1868 seg=0.4710 semseg=0.2335 mard=2.0409 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.869/0.834/0.898 wmean=1.000 grad_preclip=55.57
+[E56] batch=020/153 pseudo=4 loss=4.9147 seg=0.3898 semseg=0.3094 mard=2.0425 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.850/0.686/0.952 wmean=1.000 grad_preclip=42.33
+[E56] batch=040/153 pseudo=2 loss=0.9357 seg=0.1514 semseg=0.0838 mard=2.0549 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.956/0.953/0.958 wmean=1.000 grad_preclip=15.66
+[E56] batch=060/153 pseudo=3 loss=3.7441 seg=0.4261 semseg=0.2157 mard=2.1258 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.903/0.861/0.924 wmean=1.000 grad_preclip=25.38
+[E56] batch=080/153 pseudo=2 loss=1.5808 seg=0.1966 semseg=0.1325 mard=2.1166 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.886/0.833/0.939 wmean=1.000 grad_preclip=21.00
+[E56] batch=100/153 pseudo=4 loss=2.8398 seg=0.1689 semseg=0.1040 mard=2.1207 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.928/0.874/0.967 wmean=1.000 grad_preclip=43.71
+[E56] batch=120/153 pseudo=2 loss=1.2915 seg=0.1996 semseg=0.0713 mard=2.1662 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.930/0.917/0.943 wmean=1.000 grad_preclip=16.61
+[E56] batch=140/153 pseudo=5 loss=7.2583 seg=0.5621 semseg=0.2167 mard=2.0646 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.891/0.804/0.956 wmean=1.000 grad_preclip=55.07
+[E56] batch=153/153 pseudo=4 loss=16.1673 seg=0.7299 semseg=2.2611 mard=2.0064 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.839/0.706/0.948 wmean=1.000 grad_preclip=95.32
+
+[Epoch 56] DONE time=31.6s valid=153 skipped=0 pseudo=533 anchors=481 box_extra=72 mask_extra=52 reject_rel=20 loss=5.1032 seg=0.4491 semseg=0.3839 mard=2.0708 lambda_avg=0.000000 FG/HBG/EBG=27.9/0.0/1285.0 rel=0.881/0.665/0.970 wmean=1.000
+[E57] batch=001/153 pseudo=2 loss=2.1050 seg=0.4264 semseg=0.2782 mard=2.0756 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.907/0.882/0.931 wmean=1.000 grad_preclip=21.09
+[E57] batch=020/153 pseudo=4 loss=3.1420 seg=0.3880 semseg=0.1998 mard=2.1180 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1152 fallback=0 rel=0.858/0.686/0.939 wmean=1.000 grad_preclip=19.42
+[E57] batch=040/153 pseudo=3 loss=3.4172 seg=0.3214 semseg=0.4880 mard=2.0916 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.888/0.808/0.953 wmean=1.000 grad_preclip=26.46
+[E57] batch=060/153 pseudo=3 loss=1.5762 seg=0.1950 semseg=0.0937 mard=2.0590 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.952/0.947/0.955 wmean=1.000 grad_preclip=17.95
+[E57] batch=080/153 pseudo=4 loss=4.5715 seg=0.5099 semseg=0.1949 mard=2.0774 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.864/0.792/0.949 wmean=1.000 grad_preclip=35.10
+[E57] batch=100/153 pseudo=4 loss=6.4665 seg=0.6905 semseg=0.2238 mard=2.0461 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.884/0.796/0.956 wmean=1.000 grad_preclip=39.40
+[E57] batch=120/153 pseudo=3 loss=3.3550 seg=0.3460 semseg=0.1792 mard=2.0358 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.898/0.808/0.949 wmean=1.000 grad_preclip=22.21
+[E57] batch=140/153 pseudo=3 loss=2.5015 seg=0.3408 semseg=0.1158 mard=2.0833 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.925/0.909/0.941 wmean=1.000 grad_preclip=23.00
+[E57] batch=153/153 pseudo=3 loss=15.0994 seg=0.6467 semseg=2.3645 mard=2.0071 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.856/0.838/0.871 wmean=1.000 grad_preclip=64.95
+
+[Epoch 57] DONE time=31.5s valid=153 skipped=0 pseudo=532 anchors=476 box_extra=81 mask_extra=56 reject_rel=25 loss=5.4407 seg=0.4799 semseg=0.4015 mard=2.0710 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1297.6 rel=0.882/0.656/0.970 wmean=1.000
+[E58] batch=001/153 pseudo=4 loss=4.6741 seg=0.4321 semseg=0.2144 mard=2.0456 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.911/0.777/0.963 wmean=1.000 grad_preclip=25.86
+[E58] batch=020/153 pseudo=3 loss=7.2854 seg=0.3681 semseg=1.2399 mard=2.0785 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.798/0.700/0.853 wmean=1.000 grad_preclip=31.93
+[E58] batch=040/153 pseudo=3 loss=1.7340 seg=0.2408 semseg=0.1102 mard=2.0606 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.915/0.885/0.937 wmean=1.000 grad_preclip=25.33
+[E58] batch=060/153 pseudo=4 loss=4.5473 seg=0.3054 semseg=0.1991 mard=2.0324 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.881/0.812/0.938 wmean=1.000 grad_preclip=39.49
+[E58] batch=080/153 pseudo=3 loss=7.2722 seg=0.7530 semseg=0.3687 mard=2.0557 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.875/0.750/0.941 wmean=1.000 grad_preclip=98.44
+[E58] batch=100/153 pseudo=2 loss=1.3268 seg=0.3037 semseg=0.1301 mard=2.0996 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.937/0.929/0.945 wmean=1.000 grad_preclip=15.07
+[E58] batch=120/153 pseudo=3 loss=7.1712 seg=0.2908 semseg=1.0902 mard=2.0514 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.806/0.720/0.942 wmean=1.000 grad_preclip=33.10
+[E58] batch=140/153 pseudo=4 loss=4.4488 seg=0.3064 semseg=0.1353 mard=2.0557 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.903/0.784/0.961 wmean=1.000 grad_preclip=20.53
+[E58] batch=153/153 pseudo=3 loss=5.7086 seg=0.6964 semseg=0.2139 mard=2.1161 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.886/0.878/0.899 wmean=1.000 grad_preclip=61.33
+
+[Epoch 58] DONE time=31.4s valid=153 skipped=0 pseudo=531 anchors=484 box_extra=71 mask_extra=47 reject_rel=24 loss=5.2459 seg=0.4491 semseg=0.4268 mard=2.0680 lambda_avg=0.000000 FG/HBG/EBG=27.8/0.0/1285.0 rel=0.883/0.656/0.970 wmean=1.000
+[E59] batch=001/153 pseudo=4 loss=2.8290 seg=0.2333 semseg=0.0850 mard=2.0854 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.893/0.761/0.946 wmean=1.000 grad_preclip=37.33
+[E59] batch=020/153 pseudo=2 loss=2.6915 seg=0.2904 semseg=0.1876 mard=2.1871 lambda=0.000000 box_extra=2 mask_extra=0 FG/HBG/EBG=16/0/768 fallback=0 rel=0.902/0.896/0.909 wmean=1.000 grad_preclip=161.68
+[E59] batch=040/153 pseudo=5 loss=4.9548 seg=0.3754 semseg=0.2619 mard=2.0102 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=40/0/1536 fallback=0 rel=0.862/0.716/0.941 wmean=1.000 grad_preclip=28.84
+[E59] batch=060/153 pseudo=3 loss=3.7137 seg=0.4064 semseg=0.2456 mard=2.0443 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.815/0.744/0.895 wmean=1.000 grad_preclip=36.87
+[E59] batch=080/153 pseudo=3 loss=2.3302 seg=0.2454 semseg=0.0977 mard=2.0571 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.892/0.882/0.909 wmean=1.000 grad_preclip=26.92
+[E59] batch=100/153 pseudo=2 loss=2.2896 seg=0.3051 semseg=0.1391 mard=2.1495 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=16/0/768 fallback=0 rel=0.866/0.789/0.943 wmean=1.000 grad_preclip=17.80
+[E59] batch=120/153 pseudo=3 loss=2.1676 seg=0.3611 semseg=0.1469 mard=2.0379 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.932/0.914/0.951 wmean=1.000 grad_preclip=24.16
+[E59] batch=140/153 pseudo=4 loss=13.9825 seg=0.7829 semseg=1.3922 mard=2.0284 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.877/0.700/0.958 wmean=1.000 grad_preclip=70.17
+[E59] batch=153/153 pseudo=3 loss=3.9235 seg=0.3882 semseg=0.2324 mard=2.1682 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=24/0/1152 fallback=0 rel=0.907/0.807/0.961 wmean=1.000 grad_preclip=26.75
+
+[Epoch 59] DONE time=31.3s valid=153 skipped=0 pseudo=525 anchors=477 box_extra=75 mask_extra=48 reject_rel=27 loss=4.8486 seg=0.4443 semseg=0.3627 mard=2.0752 lambda_avg=0.000000 FG/HBG/EBG=27.5/0.0/1272.5 rel=0.883/0.666/0.970 wmean=1.000
+[E60] batch=001/153 pseudo=4 loss=4.2449 seg=0.3335 semseg=0.1569 mard=1.9986 lambda=0.000000 box_extra=1 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.888/0.841/0.936 wmean=1.000 grad_preclip=37.49
+[E60] batch=020/153 pseudo=4 loss=3.3165 seg=0.2919 semseg=0.1554 mard=2.0509 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.887/0.819/0.935 wmean=1.000 grad_preclip=32.99
+[E60] batch=040/153 pseudo=4 loss=5.8465 seg=0.3573 semseg=0.4598 mard=2.0275 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.850/0.759/0.926 wmean=1.000 grad_preclip=24.93
+[E60] batch=060/153 pseudo=4 loss=6.9072 seg=0.3577 semseg=0.4519 mard=2.0188 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.871/0.688/0.942 wmean=1.000 grad_preclip=37.43
+[E60] batch=080/153 pseudo=4 loss=3.1201 seg=0.2669 semseg=0.1295 mard=2.0350 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.854/0.721/0.955 wmean=1.000 grad_preclip=27.21
+[E60] batch=100/153 pseudo=4 loss=15.2968 seg=1.0571 semseg=1.2471 mard=2.0467 lambda=0.000000 box_extra=1 mask_extra=1 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.875/0.824/0.948 wmean=1.000 grad_preclip=100.68
+[E60] batch=120/153 pseudo=4 loss=8.5295 seg=0.6202 semseg=0.5116 mard=2.0381 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.786/0.656/0.888 wmean=1.000 grad_preclip=34.02
+[E60] batch=140/153 pseudo=4 loss=2.6378 seg=0.2108 semseg=0.0983 mard=2.0401 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.913/0.875/0.943 wmean=1.000 grad_preclip=22.60
+[E60] batch=153/153 pseudo=4 loss=2.7230 seg=0.2744 semseg=0.0942 mard=2.0553 lambda=0.000000 box_extra=0 mask_extra=0 FG/HBG/EBG=32/0/1536 fallback=0 rel=0.934/0.890/0.956 wmean=1.000 grad_preclip=21.18
+
+[Epoch 60] DONE time=31.4s valid=153 skipped=0 pseudo=540 anchors=485 box_extra=82 mask_extra=55 reject_rel=27 loss=5.2361 seg=0.4704 semseg=0.3633 mard=2.0638 lambda_avg=0.000000 FG/HBG/EBG=28.2/0.0/1315.1 rel=0.881/0.656/0.970 wmean=1.000
+[SAVE] /home/dang/MedRT-SFOD/runs/seg/ablation/k2c_maskdhf_only_60ep/checkpoints/dense_sfseg_epoch_60.pt
+
+[PASS] Dense SFSeg run completed
