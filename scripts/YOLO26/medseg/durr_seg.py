@@ -21,6 +21,21 @@ Core routing signals (all label-free):
 
 No target GT is read here.
 No new inference-time parameters are introduced.
+
+Sign-ablation modes (see `generate_durr_pseudo_masks(signed_mode=...)`):
+  signed_reliability : default/full formulation. weight = |delta| * pair
+                       reliability, target = clip(P_o + g*delta). Sign
+                       preserved, reliability-weighted.
+  signed             : weight = |delta| only (drops reliability
+                       weighting), target = clip(P_o + g*delta). Isolates
+                       whether reliability weighting matters.
+  unsigned           : weight = |delta| * pair reliability, target =
+                       clip(P_o + g*|delta|). Uses disagreement magnitude
+                       but discards its sign (always pushes outward).
+  magnitude_only     : weight = pair reliability (constant), target =
+                       P_o (no shift). |delta| only gates WHERE routing
+                       is active, never HOW the target moves -- the
+                       "uncertainty as filtering" baseline.
 """
 
 from __future__ import annotations
@@ -39,6 +54,13 @@ from mask_dhf_seg import (
 )
 
 EPS = 1e-8
+
+DURR_SIGNED_MODES = (
+    "magnitude_only",
+    "unsigned",
+    "signed",
+    "signed_reliability",
+)
 
 
 def _same_class_best_iou(
@@ -194,6 +216,7 @@ def generate_durr_pseudo_masks(
     rescue_min_support: int = 0,
     evidence_conf: float = 0.10,
     safe_bg_teacher_prob: float = 0.10,
+    signed_mode: str = "signed_reliability",
 ):
     """
     Build standard hard Mask-DHF pseudo masks plus DURR routing maps.
@@ -225,6 +248,10 @@ def generate_durr_pseudo_masks(
         raise ValueError("boundary_kernel must be positive odd")
     if max_witnesses < 0:
         raise ValueError("max_witnesses must be >= 0")
+    if signed_mode not in DURR_SIGNED_MODES:
+        raise ValueError(
+            f"signed_mode must be one of {DURR_SIGNED_MODES}, got {signed_mode!r}"
+        )
 
     teacher.eval()
     outputs = teacher(
@@ -444,17 +471,32 @@ def generate_durr_pseudo_masks(
             if not active.any():
                 continue
 
-            local_w = delta.abs() * pair_rel
+            po = anchor_probs[anchor_idx].float()
+
+            # Sign-ablation switch (module docstring / DURR_SIGNED_MODES).
+            # All four modes share the same `active` gating region above;
+            # they differ only in the per-pixel weight and directional
+            # target. `pair_rel` is a scalar per anchor, so it broadcasts.
+            if signed_mode == "signed_reliability":
+                local_w = delta.abs() * pair_rel
+                target = torch.clamp(po + route_gain * delta, 0.0, 1.0)
+            elif signed_mode == "signed":
+                local_w = delta.abs()
+                target = torch.clamp(po + route_gain * delta, 0.0, 1.0)
+            elif signed_mode == "unsigned":
+                local_w = delta.abs() * pair_rel
+                target = torch.clamp(
+                    po + route_gain * delta.abs(), 0.0, 1.0
+                )
+            else:  # magnitude_only
+                local_w = torch.full_like(delta, float(pair_rel))
+                target = po
+
             # If several objects overlap, keep the strongest route per pixel.
             replace = active & (local_w > directional_weight)
             signed_delta_map[replace] = delta[replace]
             directional_weight[replace] = local_w[replace]
-            directional_target[replace] = torch.clamp(
-                anchor_probs[anchor_idx][replace].float()
-                + route_gain * delta[replace],
-                0.0,
-                1.0,
-            )
+            directional_target[replace] = target[replace]
 
             totals["durr_matched_anchors"] += 1
             totals["durr_witnesses"] += int(witness_ids.numel())
