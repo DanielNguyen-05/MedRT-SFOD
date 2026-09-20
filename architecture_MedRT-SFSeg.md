@@ -10,6 +10,10 @@
 > **Proposed experimental pipeline:** **AdaBN → Mean Teacher → Mask-DHF → DURR → Student Loss + SegMARD-v2**  
 > **DURR status:** proposed/experimental. Do not claim an accuracy improvement until the full experiment is evaluated.
 
+> **BraTS2024 extension:** [protocol và lệnh chạy](docs/BraTS2024.md). Giữ MedRT-SFSeg,
+> mở rộng DURR theo bốn lớp NETC/SNFH/ET/RC và tạo bốn hướng modality độc lập. Kết quả
+> polyp bên dưới là kết quả của bài toán cũ, không được coi là kết quả BraTS.
+
 ---
 
 # 1. Mục tiêu

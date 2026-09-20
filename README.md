@@ -7,9 +7,10 @@
 > Main adaptation: **AdaBN → Mean Teacher → Mask-DHF → MARD**  
 > Compression: **RASP-SFSeg → physical compaction**
 
-BraTS2023: xem [hướng dẫn train/val/test](docs/BraTS2023.md) và
-[notebook GPU](colab/07_BraTS2023_Train_Val_Test.ipynb) cho baseline YOLO26-S-Seg
-với split theo bệnh nhân, bản sửa MEN và đánh giá mask gốc theo từng nhóm GLI/MEN/PED.
+BraTS2024-GLI: xem [hướng dẫn MedRT-SFSeg source-free](docs/BraTS2024.md),
+[cấu hình](configs/experiments/brats2024_sfseg.yaml) và
+[notebook GPU](colab/07_BraTS2024_SFSeg.ipynb). Bốn hướng modality độc lập dùng
+AdaBN → Mean Teacher → Mask-DHF → DURR theo lớp + SegMARD-v2, chia theo bệnh nhân.
 
 ---
 

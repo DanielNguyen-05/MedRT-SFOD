@@ -217,6 +217,7 @@ def generate_durr_pseudo_masks(
     evidence_conf: float = 0.10,
     safe_bg_teacher_prob: float = 0.10,
     signed_mode: str = "signed_reliability",
+    decoded_predictions=None,
 ):
     """
     Build standard hard Mask-DHF pseudo masks plus DURR routing maps.
@@ -253,30 +254,26 @@ def generate_durr_pseudo_masks(
             f"signed_mode must be one of {DURR_SIGNED_MODES}, got {signed_mode!r}"
         )
 
-    teacher.eval()
-    outputs = teacher(
-        weak_imgs,
-        augment=False,
-        visualize=False,
-    )
-    if not (isinstance(outputs, tuple) and len(outputs) == 2):
-        raise RuntimeError("Unexpected Teacher output")
-
-    first, branches = outputs
-    if not (isinstance(first, tuple) and len(first) == 2):
-        raise RuntimeError("Expected ((O2O, proto), branches)")
-
-    final_o2o, proto = first
-    if isinstance(proto, (tuple, list)):
-        proto = proto[0]
-    if not isinstance(branches, dict):
-        raise RuntimeError("Missing Teacher branch dictionary")
-
-    head = teacher.model[-1]
-    decoded_o2m = head._inference(
-        branches["one2many"]
-    ).permute(0, 2, 1)
-    final_o2m = head.postprocess(decoded_o2m)
+    if decoded_predictions is None:
+        teacher.eval()
+        outputs = teacher(weak_imgs, augment=False, visualize=False)
+        if not (isinstance(outputs, tuple) and len(outputs) == 2):
+            raise RuntimeError("Unexpected Teacher output")
+        first, branches = outputs
+        if not (isinstance(first, tuple) and len(first) == 2):
+            raise RuntimeError("Expected ((O2O, proto), branches)")
+        final_o2o, proto = first
+        if isinstance(proto, (tuple, list)):
+            proto = proto[0]
+        if not isinstance(branches, dict):
+            raise RuntimeError("Missing Teacher branch dictionary")
+        head = teacher.model[-1]
+        decoded_o2m = head._inference(branches["one2many"]).permute(0, 2, 1)
+        final_o2m = head.postprocess(decoded_o2m)
+    else:
+        # Reuse one Teacher forward for all classes. Lists may contain a
+        # different number of detections per image after class filtering.
+        final_o2o, final_o2m, proto = decoded_predictions
 
     input_h = int(weak_imgs.shape[2])
     input_w = int(weak_imgs.shape[3])
