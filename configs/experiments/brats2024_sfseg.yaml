@@ -1,0 +1,71 @@
+# MedRT-SFSeg on BraTS2024 GLI. Each direction is an independent experiment.
+raw_root: dataset/BraTS2024
+prepared_root: dataset/BraTS2024-SFSeg
+project: runs/seg/brats2024_sfseg
+directions: [t1n_to_t2w, t2w_to_t1n, t1c_to_t2f, t2f_to_t1c]
+seed: 29
+device: '0'
+imgsz: 256
+batch: 8
+workers: 4
+split:
+  # Patient-level: source_train, source_val, target_train, target_test.
+  # This is stricter than Tell2Adapt's reported slice-wise 80/20 split.
+  fractions: [0.45, 0.10, 0.30, 0.15]
+source:
+  weights: yolo26s-seg.pt
+  epochs: 100
+  patience: 20
+  lr: 0.001
+adabn_epochs: 2
+adaptation:
+  epochs: 60
+  lr: 0.0001
+  ema: 0.999
+  calibration_images: 4096  # Deterministic image-only subsample; 0 = all target train.
+  tau_o2o: 0.5
+  tau_o2m: 0.5
+  tau_no: 0.2
+  tau_dup: 0.7
+  tau_match: 0.5
+  max_witnesses: 5
+  mask_threshold: 0.5
+  stability_low: 0.4
+  stability_high: 0.6
+  min_mask_pixels: 16
+  boundary_kernel: 5
+  route_gain: 1.0
+  route_min_disagreement: 0.02
+  rescue_conf: 0.8
+  rescue_stability: 0.8
+  rescue_consensus_iou: 0.7
+  rescue_min_support: 0
+  evidence_conf: 0.1
+  safe_bg_teacher_prob: 0.1
+  signed_mode: signed_reliability
+  hall_student_threshold: 0.8
+  hall_area_threshold: 0.1
+  hall_area_weight: 0.25
+  lambda_dir: 0.1
+  lambda_rescue: 0.2
+  lambda_hall: 0.1
+  warmup_epochs: 5.0
+  segmard:
+    mard_lambda0: 0.05
+    mard_lambda_max: 0.20
+    mard_gamma: 1.0
+    mard_alpha: 1.0
+    mard_beta: 0.1
+    mard_warmup_epochs: 5.0
+    mard_gate_threshold: 0.5
+    mard_topk_boxes: 15
+    mard_fg_points: 8
+    mard_bg_points: 128
+    mard_eta: 12.0
+    mard_box_conf: 0.5
+    segmard_erode_kernel: 1
+    segmard_dilate_kernel: 1
+    segmard_hard_bg_ratio: 0.5
+    segmard_reliability_weighting: false
+evaluation:
+  confidence: 0.25  # Fixed before test, never selected by target scores.

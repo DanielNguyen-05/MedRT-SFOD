@@ -531,6 +531,10 @@ class v8SegmentationLoss(v8DetectionLoss):
                     for i in range(batch_size):
                         instance_mask_i = masks[batch_idx == i]  # [num_instances_i, H, W]
                         if len(instance_mask_i) == 0:
+                            # A blank labeled slice is background, not class 0.
+                            # one_hot(0) above otherwise supervises the whole image
+                            # as foreground whenever another batch item has masks.
+                            sem_masks[i] = 0
                             continue
                         sem_masks[i, :, instance_mask_i.sum(dim=0) == 0] = 0
 
