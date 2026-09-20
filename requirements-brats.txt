@@ -1,0 +1,2 @@
+# Install the repository environment first: python -m pip install -e .
+nibabel>=5.2,<6
