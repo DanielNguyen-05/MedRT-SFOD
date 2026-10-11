@@ -254,3 +254,5 @@ rasp_depgraph_audit*.json
 #   *.md
 #   requirements*.txt
 # ============================================================
+
+logs/
