@@ -128,7 +128,11 @@ python scripts/YOLO26/medseg/brats2024_experiments.py --stage all --directions t
 Chạy lần lượt cả bốn hướng:
 
 ```bash
-python scripts/YOLO26/medseg/brats2024_experiments.py --stage all --device 0
+mkdir -p logs/brats2024
+
+nohup .venv/bin/python -u scripts/YOLO26/medseg/brats2024_experiments.py \
+  --stage all --device 0 \
+  > logs/brats2024/full_$(date +%Y%m%d_%H%M%S).log 2>&1 &
 ```
 
 Tách giai đoạn khi cần:
