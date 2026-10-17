@@ -613,6 +613,7 @@ def run_automatic_post_training_trace(
             rescue_min_support=args.durr_rescue_min_support,
             evidence_conf=args.durr_evidence_conf,
             safe_bg_teacher_prob=args.durr_safe_bg_teacher_prob,
+            signed_mode=args.durr_signed_mode,
         )
         return routes[0]
 
@@ -1027,6 +1028,16 @@ def main():
         type=float,
         default=5.0,
     )
+    ap.add_argument(
+        "--durr-signed-mode",
+        choices=["magnitude_only", "unsigned", "signed", "signed_reliability"],
+        default="signed_reliability",
+        help=(
+            "Sign-ablation switch for DURR's directional routing target/"
+            "weight (see durr_seg.py module docstring: DURR_SIGNED_MODES). "
+            "Default reproduces the original full formulation."
+        ),
+    )
 
     # SegMARD-v2.
     ap.add_argument("--mard-lambda0", type=float, default=0.05)
@@ -1194,6 +1205,7 @@ def main():
         args.durr_lambda_rescue,
         args.durr_lambda_hall,
     )
+    print("signed mode   :", args.durr_signed_mode)
     print(
         "SegMARD-v2    : hard-bg-ratio",
         args.segmard_hard_bg_ratio,
@@ -1282,6 +1294,7 @@ def main():
                     rescue_min_support=args.durr_rescue_min_support,
                     evidence_conf=args.durr_evidence_conf,
                     safe_bg_teacher_prob=args.durr_safe_bg_teacher_prob,
+                    signed_mode=args.durr_signed_mode,
                 )
 
                 valid = [
@@ -1648,6 +1661,7 @@ def main():
         "epochs": args.epochs,
         "durr": {
             "name": "Dual-head Uncertainty Reliability Routing",
+            "signed_mode": args.durr_signed_mode,
             "signed_boundary_routing": True,
             "reliable_o2m_rescue": True,
             "safe_hallucination_suppression": True,
