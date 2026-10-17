@@ -209,6 +209,20 @@ def main():
                     if iou > best_iou:
                         best_iou, best_idx = iou, pi
 
+            # Same-class match: the any-class best-IoU box can be a junk low-conf box of
+            # another class while a correct-class box sits at slightly lower IoU.
+            focus_id = name_to_id[name]
+            same_iou, same_idx = 0.0, None
+            for gt_box in gt_boxes_focus:
+                for pi, pbox in enumerate(pred_boxes):
+                    if int(pred_cls[pi]) != focus_id:
+                        continue
+                    iou = iou_xyxy(gt_box, tuple(pbox))
+                    if iou > same_iou:
+                        same_iou, same_idx = iou, pi
+            focus_confs = pred_conf[pred_cls == focus_id]
+            max_focus_conf = float(focus_confs.max()) if len(focus_confs) else None
+
             best_conf = float(pred_conf[best_idx]) if best_idx is not None else None
             best_class = NAMES[int(pred_cls[best_idx])] if best_idx is not None else None
             n_pass_eval = int((pred_conf >= conf_eval).sum())
@@ -217,7 +231,10 @@ def main():
                        n_pred_low_conf=int(len(pred_boxes)), n_pred_pass_eval=n_pass_eval,
                        best_iou=round(best_iou, 4), best_match_conf=best_conf, best_match_class=best_class,
                        class_correct=(best_class == name) if best_class else None,
-                       localized=best_iou >= args.iou_match_thresh)
+                       localized=best_iou >= args.iou_match_thresh,
+                       same_class_iou=round(same_iou, 4),
+                       same_class_conf=float(pred_conf[same_idx]) if same_idx is not None else None,
+                       max_focus_class_conf_anywhere=max_focus_conf)
             rows.append(row)
 
             # --- overlay image ---
@@ -273,18 +290,27 @@ def main():
             confs = [r['best_match_conf'] for r in sub if r['localized'] and r['best_match_conf'] is not None]
             if confs:
                 print(f'  of localized: best-match confidence mean={np.mean(confs):.3f} median={np.median(confs):.3f}')
-        if n_localized == 0:
-            print('  -> DIAGNOSIS: no-proposal / localization failure (the head never puts a box '
-                  'near this lesion, at any confidence). Not a thresholding or class-confusion issue.')
-        elif n_localized_conf_pass < n_localized and n_localized_class_correct >= n_localized_conf_pass:
-            print('  -> DIAGNOSIS: confidence collapse under domain shift (boxes land on the lesion '
-                  'but score below the eval threshold) -- likely AdaBN/DURR calibration, not localization.')
-        elif n_localized_class_correct < n_localized:
-            print('  -> DIAGNOSIS: class confusion among the four fine-grained sub-regions '
-                  '(box lands on the lesion, confidence may be fine, but wrong class wins).')
+        same_ok = [r for r in sub if r['same_class_iou'] >= 0.5]
+        same_ok_pass = [r for r in same_ok if r['same_class_conf'] >= conf_eval]
+        print(f'  same-class box with IoU >= 0.5: {len(same_ok)}/{n}; of those conf >= {conf_eval}: {len(same_ok_pass)}/{len(same_ok) or 1}')
+        sc = [r['same_class_conf'] for r in sub if r['same_class_conf'] is not None]
+        mx = [r['max_focus_class_conf_anywhere'] for r in sub if r['max_focus_class_conf_anywhere'] is not None]
+        if sc:
+            print(f'  same-class best-IoU box conf: median={np.median(sc):.3f}; max {name} conf anywhere in slice: median={np.median(mx):.3f}')
+        context = ('in-domain (no modality shift)' if args.role == 'source_val'
+                   else f'target domain, stage={args.stage}')
+        if len(same_ok) == 0:
+            print(f'  -> DIAGNOSIS ({context}): no confident-or-not {name} box tightly covers the lesion '
+                  '(same-class IoU >= 0.5 never reached). The model has not learned to localize this '
+                  'class here; thresholds/calibration cannot fix it.')
+        elif len(same_ok_pass) < len(same_ok):
+            print(f'  -> DIAGNOSIS ({context}): correct-class boxes exist on the lesion but score below '
+                  f'{conf_eval}. Low confidence for this class'
+                  + (' even without domain shift -> source training problem.' if args.role == 'source_val'
+                     else '; compare with --role source_val to see if it is shift-induced.'))
         else:
-            print('  -> DIAGNOSIS: localization and confidence look fine on these examples; '
-                  'the low aggregate Dice may be driven by other slices/cases outside this sample.')
+            print(f'  -> DIAGNOSIS ({context}): correct-class, confident boxes on these examples; '
+                  'look at other slices/cases for the failure.')
 
 
 if __name__ == '__main__':
