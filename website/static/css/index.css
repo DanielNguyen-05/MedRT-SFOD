@@ -1,0 +1,278 @@
+/* MedRT-SFSeg project page. Layout follows the Nerfies template (Bulma). */
+
+:root {
+  --ink: #1f2933;
+  --muted: #5b6770;
+  --accent: #0e7c86;        /* teal: links, "ours" */
+  --accent-soft: #e6f4f5;
+  --best: #c0392b;          /* paper convention: best in red */
+  --second: #1f5fbf;        /* second-best in blue */
+  --line: #dfe3e6;
+  --panel: #f7f8f9;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--ink);
+}
+
+.title { color: var(--ink); }
+
+a { color: var(--accent); }
+a:hover { color: #0a5a62; }
+
+/* ---------- Header ---------- */
+
+.publication-header .hero-body { padding-bottom: 1.5rem; }
+
+.publication-kicker {
+  font-family: 'Google Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  color: var(--accent);
+  margin-bottom: 0.9rem;
+}
+
+.publication-title {
+  font-family: 'Google Sans', sans-serif;
+  line-height: 1.15 !important;
+  text-wrap: balance;
+}
+
+.publication-authors,
+.publication-affiliations,
+.publication-notes {
+  font-family: 'Google Sans', sans-serif;
+}
+
+.publication-authors { margin-top: 1.25rem; }
+.publication-authors a { color: hsl(204, 86%, 45%) !important; }
+.publication-authors a:hover { text-decoration: underline; }
+
+.publication-affiliations { margin-top: 0.6rem; color: var(--ink); }
+.publication-affiliations .author-block { margin: 0 0.5rem; }
+
+.publication-notes { margin-top: 0.4rem; color: var(--muted); }
+.publication-notes .author-block { margin: 0 0.5rem; }
+
+.author-block { display: inline-block; }
+
+.link-block a { margin: 5px 3px; }
+
+.button.is-soon {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+.button.is-soon small { font-size: 0.8em; margin-left: 0.25em; opacity: 0.9; }
+
+/* ---------- Teaser ---------- */
+
+.teaser { font-family: 'Google Sans', sans-serif; }
+.teaser .hero-body { padding-top: 0; padding-bottom: 3rem; }
+
+.teaser-figure {
+  margin: 0 0 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.teaser-figure img { display: block; width: 100%; height: auto; }
+
+.teaser .subtitle { color: #3b4750; line-height: 1.5; }
+
+.method-name { font-weight: 700; }
+
+/* ---------- Key numbers ---------- */
+
+.stat-row { margin-top: 0; margin-bottom: 0; }
+.stat { text-align: center; padding: 0.5rem 0.25rem; }
+.stat-value {
+  font-family: 'Google Sans', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stat-unit { font-size: 1.1rem; font-weight: 500; color: var(--muted); }
+.stat-label { margin-top: 0.35rem; font-size: 0.9rem; font-weight: 500; }
+.stat-delta { font-size: 0.8rem; color: var(--accent); margin-top: 0.15rem; }
+
+/* ---------- Carousel ---------- */
+
+.results-carousel { overflow: hidden; }
+.results-carousel .item {
+  margin: 5px;
+  overflow: hidden;
+  border: 1px solid #bbb;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 0;
+  background: #000;
+}
+.results-carousel .item img { display: block; width: 100%; height: auto; }
+
+.results-carousel .slider-pagination { display: none; }
+
+.carousel-caption { margin-top: 0.9rem; font-size: 0.9rem; color: var(--muted); }
+.legend { display: inline-block; margin-left: 0.9rem; white-space: nowrap; }
+.swatch {
+  display: inline-block;
+  width: 0.85em; height: 0.85em;
+  border-radius: 2px;
+  margin-right: 0.35em;
+  vertical-align: -0.08em;
+}
+.swatch-pred { background: #3cd6ff; }
+.swatch-gt { background: #78ff5a; border: 1px solid #4b9a3a; }
+
+/* ---------- Method ---------- */
+
+.method-cards { margin-top: 0.5rem; margin-bottom: 1rem; }
+.method-card {
+  height: 100%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 1.25rem 1.25rem 1.4rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.method-card .title { margin-bottom: 0.6rem; }
+.method-card-tag {
+  font-family: 'Google Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+/* Component colors echo the overview figure. */
+.card-dhf { border-top-color: #9b59d0; }
+.card-durr { border-top-color: #e05252; }
+.card-mard { border-top-color: #a9805c; }
+
+.math { font-family: 'Castoro', 'Times New Roman', serif; font-style: italic; white-space: nowrap; }
+
+.equation-block {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.equation {
+  font-family: 'Castoro', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 1.5rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.equation-legend { margin: 0.9rem 0 0.7rem; }
+.eq-pill {
+  display: inline-block;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  margin: 0.2rem 0.3rem;
+}
+.eq-expand { background: #fdecea; color: #b03a2e; }
+.eq-shrink { background: #e8f3e3; color: #3d6b1f; }
+.equation-note { font-size: 0.88rem; color: var(--muted); max-width: 40rem; margin: 0 auto; }
+
+/* ---------- Results ---------- */
+
+.section-alt { background: var(--panel); }
+
+.results-table {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.table.results-table th:not(.has-text-left),
+.table.results-table td:not(.has-text-left) { text-align: center; }
+.results-table th,
+.results-table td {
+  vertical-align: middle;
+  white-space: nowrap;
+  border-color: #eceff1;
+}
+.results-table thead th {
+  font-family: 'Google Sans', sans-serif;
+  font-weight: 700;
+  background: #f1f3f4;
+  color: var(--ink);
+  border-bottom-width: 1px;
+}
+.results-table thead tr:first-child th[colspan] { border-bottom: 1px solid var(--line); }
+.results-table td.has-text-left,
+.results-table th.has-text-left { text-align: left; }
+
+.results-table .row-ref td { color: var(--muted); }
+.results-table .row-ref-last td { border-bottom: 2px solid var(--line); }
+.results-table .row-ours td { background: var(--accent-soft); font-weight: 700; }
+.results-table .row-ours td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+.results-table.is-hoverable tbody tr.row-ours:hover td { background: #d8eeef; }
+
+.best { color: var(--best); font-weight: 700; }
+.second { color: var(--second); font-weight: 700; }
+
+.table-note { font-size: 0.85rem; color: var(--muted); margin-top: -0.75rem; }
+.table-container { margin-bottom: 1.5rem; }
+
+.efficiency-table { max-width: 40rem; margin-left: auto; margin-right: auto; }
+
+/* ---------- Figures ---------- */
+
+.paper-figure { margin: 0 0 1.5rem; }
+.paper-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.paper-figure figcaption {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 0.7rem;
+  text-align: center;
+}
+
+/* ---------- BibTeX / footer ---------- */
+
+.bibtex-wrap { position: relative; }
+.bibtex-wrap pre { padding-top: 2.25rem; border-radius: 8px; }
+.copy-button { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1; }
+
+.footer .icon-link { font-size: 25px; color: #000; }
+.footer-note { font-size: 0.9rem; color: var(--muted); }
+
+/* ---------- Small screens ---------- */
+
+@media screen and (max-width: 768px) {
+  .publication-title { font-size: 1.9rem !important; }
+  .publication-affiliations .author-block { display: block; margin: 0.1rem 0; }
+  .stat-value { font-size: 1.9rem; }
+  .equation { font-size: 1.15rem; }
+  .teaser .subtitle { font-size: 1.05rem; }
+  .legend { display: block; margin: 0.3rem 0 0; }
+  .content.has-text-justified { text-align: left !important; }
+}

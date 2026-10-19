@@ -1,3 +1,6 @@
+# MedRT-SFSeg — Medical Source-Free Segmentation Pipeline
+
+> Repository root: `~/MedRT-SFSeg`  
 # MedRT-SFOD — Medical Source-Free Segmentation Pipeline
 
 > Repository root: `~/MedRT-SFOD`  
@@ -17,7 +20,7 @@ AdaBN → Mean Teacher → Mask-DHF → DURR theo lớp + SegMARD-v2, chia theo 
 # 0. Environment
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 ```
@@ -61,7 +64,7 @@ python -m pip install scikit-learn kneed torch-pruning thop
 # 1. Project pre-flight
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 
@@ -173,7 +176,7 @@ dataset/CVC-ClinicDB-YOLO26/
 Skip this section if `dataset/Kvasir-SEG-YOLO26/` already contains the canonical prepared split.
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 
@@ -780,7 +783,7 @@ tail -f logs/seg/benchmarks/cvc_clinicdb_dense_sfseg_epoch60_eval.log
 ## 17a. Training
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 
@@ -859,7 +862,7 @@ echo "PID=$!"
 ## 18a. Training
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 
@@ -920,7 +923,7 @@ echo "PID=$!"
 ## 18b. Evaluation
 
 ```bash
-cd ~/MedRT-SFOD
+cd ~/MedRT-SFSeg
 source .venv/bin/activate
 export PYTHONPATH="$PWD"
 

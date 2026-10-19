@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="MedRT-SFSeg: a real-time source-free domain adaptation framework for polyp segmentation built on a dual-head O2O/O2M YOLO segmentation architecture.">
+  <meta name="keywords"
+        content="MedRT-SFSeg, source-free domain adaptation, polyp segmentation, real-time segmentation, uncertainty routing, dual-head prediction, YOLO26">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:title" content="MedRT-SFSeg: Directional Dual-Head Supervision for Real-Time Source-Free Polyp Segmentation">
+  <meta property="og:description"
+        content="Signed O2O/O2M disagreement becomes directional supervision for source-free polyp segmentation, at more than 62 FPS end-to-end.">
+  <meta property="og:image" content="./static/images/overview.png">
+  <meta property="og:type" content="website">
+  <title>MedRT-SFSeg: Directional Dual-Head Supervision for Real-Time Source-Free Polyp Segmentation</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans:400,500,700|Noto+Sans:400,500,700|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script defer src="./static/js/index.js"></script>
+</head>
+<body>
+
+<!-- ============================== Title ============================== -->
+<section class="hero publication-header">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <p class="publication-kicker">MedRT-SFSeg</p>
+          <h1 class="title is-1 publication-title">
+            Directional Dual-Head Supervision for Real-Time Source-Free Polyp Segmentation
+          </h1>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://orcid.org/0009-0002-6475-6299" target="_blank" rel="noopener">Hai-Dang Nguyen</a><sup>1,2,*</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://orcid.org/0009-0000-7143-4226" target="_blank" rel="noopener">Nhat-Khoi Le</a><sup>1,2,*</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://orcid.org/0009-0003-3984-3355" target="_blank" rel="noopener">Huu-Thuan Huynh</a><sup>1,2</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://orcid.org/0000-0003-3046-3041" target="_blank" rel="noopener">Minh-Triet Tran</a><sup>1,2</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://orcid.org/0000-0002-7363-2610" target="_blank" rel="noopener">Trung-Nghia Le</a><sup>1,2,&dagger;</sup>
+            </span>
+          </div>
+
+          <div class="is-size-6 publication-affiliations">
+            <span class="author-block"><sup>1</sup>University of Science, VNU-HCM, Ho Chi Minh City, Vietnam</span>
+            <span class="author-block"><sup>2</sup>Vietnam National University, Ho Chi Minh City, Vietnam</span>
+          </div>
+          <div class="is-size-7 publication-notes">
+            <span class="author-block"><sup>*</sup>Equal contribution</span>
+            <span class="author-block"><sup>&dagger;</sup>Corresponding author</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- TODO: replace href and remove "is-soon" once the paper PDF is public. -->
+              <span class="link-block">
+                <a class="button is-normal is-rounded is-dark is-soon" aria-disabled="true" tabindex="-1">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper <small>(coming soon)</small></span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://github.com/DanielNguyen-05/MedRT-SFOD" target="_blank" rel="noopener"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="#BibTeX" class="button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-quote-right"></i></span>
+                  <span>BibTeX</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== Teaser ============================== -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <figure class="teaser-figure">
+        <img src="./static/images/overview.png"
+             alt="Overview of MedRT-SFSeg: a source-trained dual-head segmentation model is adapted to the target domain with AdaBN and Mean-Teacher self-training, using Mask-DHF, DURR and Seg-MARD.">
+      </figure>
+      <h2 class="subtitle has-text-centered">
+        <span class="method-name">MedRT-SFSeg</span> adapts a dual-head YOLO segmentation model to a new
+        endoscopy domain without source data, turning the <em>sign</em> of O2O/O2M disagreement into
+        expand-or-shrink supervision. Only the adapted O2O Student is used at inference.
+      </h2>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== Key numbers ============================== -->
+<section class="hero is-light is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-mobile is-multiline stat-row">
+        <div class="column is-half-mobile is-one-quarter-tablet">
+          <div class="stat">
+            <p class="stat-value">80.4<span class="stat-unit">%</span></p>
+            <p class="stat-label">Dice, Kvasir &rarr; ClinicDB</p>
+            <p class="stat-delta">+7.7 over non-adapted baseline</p>
+          </div>
+        </div>
+        <div class="column is-half-mobile is-one-quarter-tablet">
+          <div class="stat">
+            <p class="stat-value">80.8<span class="stat-unit">%</span></p>
+            <p class="stat-label">Dice, ClinicDB &rarr; Kvasir</p>
+            <p class="stat-delta">+9.8 over non-adapted baseline</p>
+          </div>
+        </div>
+        <div class="column is-half-mobile is-one-quarter-tablet">
+          <div class="stat">
+            <p class="stat-value">62+<span class="stat-unit"> FPS</span></p>
+            <p class="stat-label">End-to-end on RTX 4060 Ti</p>
+            <p class="stat-delta">640 &times; 640, batch 1, FP32</p>
+          </div>
+        </div>
+        <div class="column is-half-mobile is-one-quarter-tablet">
+          <div class="stat">
+            <p class="stat-value">10.37<span class="stat-unit">M</span></p>
+            <p class="stat-label">Deployment parameters</p>
+            <p class="stat-delta">No overhead added by adaptation</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== Abstract ============================== -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Source-free domain adaptation (SFDA) is critical for medical image segmentation as it enables model
+            adaptation to unlabeled target domains without compromising source data privacy. However, its
+            effectiveness is often hindered by confirmation bias, where self-training models struggle with small
+            polyps, foreground hallucinations, and imprecise contours.
+          </p>
+          <p>
+            We propose <span class="method-name">MedRT-SFSeg</span>, a real-time SFDA framework based on a dual-head
+            O2O/O2M YOLO segmentation architecture. We introduce <strong>Mask-DHF</strong> to fuse precision- and
+            recall-oriented predictions into stable pseudo-instances, and <strong>DURR</strong>, which exploits
+            pixel-level disagreement for signed boundary routing to expand or shrink masks while recovering missed
+            instances and suppressing hallucinations. <strong>Seg-MARD</strong> further regularizes feature
+            representations through mask-guided region-stratified sampling.
+          </p>
+          <p>
+            Experiments on bidirectional adaptation between Kvasir-SEG and CVC-ClinicDB show that MedRT-SFSeg achieves
+            80.43%/80.77% Dice and 5.53/8.44&nbsp;mm ASD, respectively. It improves the non-adapted baseline by 7.7 and
+            9.8 Dice points while retaining more than 62&nbsp;FPS end-to-end. These results suggest that
+            segmentation-aware dual-head fusion can improve pseudo-label quality while preserving real-time inference.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== Qualitative carousel ============================== -->
+<section class="hero is-light is-small">
+  <div class="hero-body">
+    <div class="container">
+      <div id="results-carousel" class="carousel results-carousel">
+        <div class="item"><img src="./static/images/qual_01.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_02.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_03.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_04.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_05.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_06.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_07.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_08.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_09.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_10.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_11.jpg" alt="CVC-ClinicDB example: predicted mask and ground-truth contour" loading="lazy"></div>
+        <div class="item"><img src="./static/images/qual_12.jpg" alt="Kvasir-SEG example: predicted mask and ground-truth contour" loading="lazy"></div>
+      </div>
+      <p class="carousel-caption has-text-centered">
+        Selected target-domain predictions of the adapted Student on CVC-ClinicDB and Kvasir-SEG.
+        <span class="legend"><span class="swatch swatch-pred"></span>prediction</span>
+        <span class="legend"><span class="swatch swatch-gt"></span>ground-truth contour</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== Method ============================== -->
+<section class="section">
+  <div class="container is-max-desktop">
+
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Method</h2>
+        <div class="content has-text-justified">
+          <p>
+            Existing uncertainty-based SFDA methods mostly treat uncertainty as a trust decision: unreliable pixels
+            are filtered, down-weighted, or denoised. At an ambiguous boundary, however, the useful question is not
+            only <em>whether</em> a prediction is uncertain but <em>how it should change</em>. An uncertain boundary
+            may mean the mask is too conservative and should expand, or that it has absorbed spurious foreground and
+            should shrink.
+          </p>
+          <p>
+            YOLO26 exposes two complementary heads: a duplicate-free one-to-one (O2O) head that gives conservative,
+            precision-oriented predictions, and a dense one-to-many (O2M) head that recovers missed instances.
+            MedRT-SFSeg starts from a source-trained YOLO26-S-Seg model, re-estimates BatchNorm statistics on unlabeled
+            target images (AdaBN), and then runs Mean-Teacher self-training in which three training-only components
+            convert dual-head disagreement into segmentation-specific supervision.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns method-cards">
+      <div class="column">
+        <div class="method-card card-dhf">
+          <p class="method-card-tag">Pseudo-instances</p>
+          <h3 class="title is-5">Mask-DHF</h3>
+          <p>
+            Extends dual-head fusion from boxes to masks. O2O predictions act as conservative anchors, matched O2M
+            predictions serve as witnesses, and low-overlap O2M predictions become coverage candidates for missed
+            instances. Each prediction receives an instance-level reliability
+            <span class="math">r = &radic;(s &middot; q<sup>stab</sup>)</span>, combining confidence with mask
+            stability across two probability thresholds.
+          </p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="method-card card-durr">
+          <p class="method-card-tag">Directional routing</p>
+          <h3 class="title is-5">DURR</h3>
+          <p>
+            Dual-Head Uncertainty Reliability Routing keeps the <em>sign</em> of the disagreement. Inside a two-sided
+            boundary band, positive disagreement asks the Student to expand and negative disagreement asks it to
+            shrink. Reliable O2M predictions additionally rescue instances the O2O head misses, and foreground is
+            suppressed where both heads agree there is none.
+          </p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="method-card card-mard">
+          <p class="method-card-tag">Feature regularization</p>
+          <h3 class="title is-5">Seg-MARD</h3>
+          <p>
+            Adapts representation diversification to segmentation by replacing box-based sampling with pseudo-mask
+            regions. At P3, P4 and P5, features are sampled from foreground, hard background (inside the box, outside
+            the mask) and easy background, then regularized with variance and covariance losses.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <div class="equation-block">
+          <p class="equation">
+            &Delta;<sub>i</sub>(x) = r<sub>i</sub><sup>m</sup> P<sub>i</sub><sup>m</sup>(x)
+            &minus; r<sub>i</sub><sup>o</sup> P<sub>i</sub><sup>o</sup>(x)
+          </p>
+          <div class="equation-legend">
+            <span class="eq-pill eq-expand">&Delta; &gt; 0 &nbsp;&rarr;&nbsp; expand the mask</span>
+            <span class="eq-pill eq-shrink">&Delta; &lt; 0 &nbsp;&rarr;&nbsp; shrink the mask</span>
+          </div>
+          <p class="equation-note">
+            Signed, reliability-weighted disagreement between the aggregated O2M evidence
+            <span class="math">P<sup>m</sup></span> and the O2O anchor <span class="math">P<sup>o</sup></span>, used
+            where <span class="math">|&Delta;| &ge; 0.02</span>.
+          </p>
+        </div>
+        <div class="content has-text-justified">
+          <p>
+            All auxiliary components (the EMA Teacher, Mask-DHF, DURR and Seg-MARD) are discarded after adaptation.
+            Only the adapted Student O2O branch is deployed, so the model keeps the parameter count and latency of the
+            original YOLO26-S-Seg.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================== Results ============================== -->
+<section class="section section-alt">
+  <div class="container is-max-desktop">
+
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Results</h2>
+        <div class="content has-text-justified">
+          <p>
+            We evaluate both source-free adaptation directions between Kvasir-SEG (1,000 images) and CVC-ClinicDB
+            (612 frames) without changing any component of the method between directions. <em>Baseline</em> is the
+            source-only model evaluated on the target domain; <em>Supervised</em> is the target-supervised upper
+            bound. Dice and Average Surface Distance (ASD) are reported as mean&nbsp;&plusmn;&nbsp;std across target
+            images.
+          </p>
+        </div>
+
+        <h3 class="title is-5">Comparison with source-free methods</h3>
+        <div class="table-container">
+          <table class="table is-fullwidth is-hoverable results-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="has-text-left">Method</th>
+                <th colspan="2">Kvasir-SEG &rarr; CVC-ClinicDB</th>
+                <th colspan="2">CVC-ClinicDB &rarr; Kvasir-SEG</th>
+              </tr>
+              <tr>
+                <th>Dice (%) &uarr;</th>
+                <th>ASD (mm) &darr;</th>
+                <th>Dice (%) &uarr;</th>
+                <th>ASD (mm) &darr;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-ref"><td class="has-text-left">Baseline</td><td>72.8 &plusmn; 33.0</td><td>5.9 &plusmn; 12.5</td><td>70.9 &plusmn; 25.2</td><td>9.8 &plusmn; 18.5</td></tr>
+              <tr class="row-ref row-ref-last"><td class="has-text-left">Supervised</td><td>96.0 &plusmn; 4.3</td><td>0.6 &plusmn; 0.6</td><td>90.3 &plusmn; 16.6</td><td>3.7 &plusmn; 10.2</td></tr>
+              <tr><td class="has-text-left">ProtoContra</td><td>78.0 &plusmn; 12.1</td><td class="best">0.9 &plusmn; 0.6</td><td class="second">68.9 &plusmn; 26.4</td><td>9.5 &plusmn; 15.0</td></tr>
+              <tr><td class="has-text-left">DPL</td><td>67.2 &plusmn; 24.0</td><td>8.0 &plusmn; 12.4</td><td>66.1 &plusmn; 33.1</td><td class="best">7.8 &plusmn; 17.7</td></tr>
+              <tr><td class="has-text-left">IAPC</td><td>73.3 &plusmn; 29.6</td><td>4.4 &plusmn; 7.9</td><td>61.2 &plusmn; 26.3</td><td>13.7 &plusmn; 13.2</td></tr>
+              <tr><td class="has-text-left">DFG</td><td>19.1 &plusmn; 14.7</td><td>97.5 &plusmn; 17.6</td><td>26.8 &plusmn; 18.1</td><td>87.5 &plusmn; 19.5</td></tr>
+              <tr><td class="has-text-left">UPL-SFDA</td><td>67.1 &plusmn; 14.6</td><td class="second">2.2 &plusmn; 0.9</td><td>60.2 &plusmn; 31.3</td><td>11.4 &plusmn; 17.2</td></tr>
+              <tr><td class="has-text-left">HEAL</td><td class="best">81.8 &plusmn; 22.6</td><td>4.3 &plusmn; 8.2</td><td>66.5 &plusmn; 28.8</td><td>9.15 &plusmn; 11.6</td></tr>
+              <tr><td class="has-text-left">IPLC</td><td>34.8 &plusmn; 11.7</td><td>34.7 &plusmn; 22.9</td><td>45.3 &plusmn; 21.2</td><td>19.2 &plusmn; 8.4</td></tr>
+              <tr><td class="has-text-left">SRPL</td><td>33.0 &plusmn; 22.7</td><td>31.4 &plusmn; 19.6</td><td>44.9 &plusmn; 26.0</td><td>18.9 &plusmn; 16.9</td></tr>
+              <tr class="row-ours"><td class="has-text-left">MedRT-SFSeg (Ours)</td><td class="second">80.4 &plusmn; 24.4</td><td>5.5 &plusmn; 10.7</td><td class="best">80.8 &plusmn; 23.3</td><td class="second">8.4 &plusmn; 15.3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note">
+          <span class="best">Best</span> and <span class="second">second-best</span> among source-free methods.
+        </p>
+
+        <h3 class="title is-5 mt-6">Ablation study</h3>
+        <div class="table-container">
+          <table class="table is-fullwidth is-hoverable results-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="has-text-left">Configuration</th>
+                <th colspan="3">Kvasir-SEG &rarr; CVC-ClinicDB</th>
+                <th colspan="3">CVC-ClinicDB &rarr; Kvasir-SEG</th>
+              </tr>
+              <tr>
+                <th>Dice (%) &uarr;</th><th>IoU (%) &uarr;</th><th>ASD (mm) &darr;</th>
+                <th>Dice (%) &uarr;</th><th>IoU (%) &uarr;</th><th>ASD (mm) &darr;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="has-text-left">Baseline</td><td>72.75</td><td>65.54</td><td>5.92</td><td>70.94</td><td>63.07</td><td>9.81</td></tr>
+              <tr><td class="has-text-left">Mask-DHF</td><td>75.83</td><td>68.17</td><td>5.78</td><td>75.04</td><td>66.92</td><td>9.25</td></tr>
+              <tr><td class="has-text-left">Mask-DHF + Seg-MARD</td><td>77.89</td><td>70.02</td><td>5.62</td><td>77.59</td><td>69.21</td><td>8.84</td></tr>
+              <tr><td class="has-text-left">Mask-DHF + DURR</td><td class="second">79.02</td><td class="second">71.92</td><td class="second">5.58</td><td class="second">79.33</td><td class="second">71.04</td><td class="second">8.59</td></tr>
+              <tr class="row-ours"><td class="has-text-left">Full MedRT-SFSeg</td><td class="best">80.43</td><td class="best">72.57</td><td class="best">5.53</td><td class="best">80.77</td><td class="best">72.52</td><td class="best">8.44</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="title is-5 mt-6">Real-time deployment</h3>
+        <div class="content has-text-justified">
+          <p>
+            Protocol: RTX 4060 Ti, 640&nbsp;&times;&nbsp;640 input, batch size 1, FP32, 100 warm-up and 500 timed
+            iterations, CUDA-synchronized. End-to-end timing excludes disk I/O. A configuration counts as real-time if
+            it sustains at least 30&nbsp;FPS end-to-end.
+          </p>
+        </div>
+        <div class="table-container">
+          <table class="table is-fullwidth is-hoverable results-table efficiency-table">
+            <thead>
+              <tr>
+                <th class="has-text-left">Metric</th>
+                <th>Kvasir &rarr; ClinicDB</th>
+                <th>ClinicDB &rarr; Kvasir</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="has-text-left">Full-graph params (M)</td><td>11.434463</td><td>11.434463</td></tr>
+              <tr><td class="has-text-left">Fused deployment params (M)</td><td>10.365727</td><td>10.365727</td></tr>
+              <tr><td class="has-text-left">Deployment GMACs</td><td>17.0229</td><td>17.0229</td></tr>
+              <tr><td class="has-text-left">Deployment GFLOPs</td><td>34.0458</td><td>34.0458</td></tr>
+              <tr class="row-ref-last"><td class="has-text-left">Checkpoint size (MB)</td><td>22.322</td><td>22.335</td></tr>
+              <tr><td class="has-text-left">Network mean latency (ms)</td><td>11.807</td><td>11.492</td></tr>
+              <tr><td class="has-text-left">Network FPS</td><td>84.69</td><td>87.01</td></tr>
+              <tr><td class="has-text-left">E2E mean latency (ms)</td><td>15.768</td><td>16.017</td></tr>
+              <tr><td class="has-text-left">E2E p95 latency (ms)</td><td>15.830</td><td>16.108</td></tr>
+              <tr><td class="has-text-left">E2E FPS</td><td>63.42</td><td>62.43</td></tr>
+              <tr class="row-ours"><td class="has-text-left">Real-time (&ge; 30 FPS)</td><td>PASS</td><td>PASS</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================== Boundary analysis ============================== -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Boundary Correction Analysis</h2>
+        <figure class="paper-figure">
+          <img src="./static/images/boundary_analysis.png" loading="lazy"
+               alt="Boundary correction analysis on representative target-domain cases: input image, ground truth, Student prediction, error decomposition, boundary overlay and absolute mask error.">
+          <figcaption>
+            From left to right: input image; ground truth; Student prediction; error decomposition (true positive,
+            false positive and false negative regions); overlay of ground-truth (green) and predicted (red)
+            boundaries; and absolute mask error.
+          </figcaption>
+        </figure>
+        <div class="content has-text-justified">
+          <p>
+            Residual errors are often concentrated around polyp contours rather than arising from gross false
+            detections. This boundary-localized behavior is consistent with the motivation of DURR, which uses signed
+            O2O/O2M disagreement to provide explicit expansion or contraction cues near uncertain boundaries.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Limitations</h2>
+        <div class="content has-text-justified">
+          <p>
+            MedRT-SFSeg depends on the dual-head O2O/O2M architecture, which restricts direct transfer to conventional
+            single-head backbones. The shared backbone may also produce correlated errors under severe domain shifts,
+            reducing the effectiveness of reliability routing. Future work will extend the framework to broader
+            architectures and more diverse multi-center clinical data.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== BibTeX ============================== -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <div class="bibtex-wrap">
+      <button class="button is-small is-light copy-button" id="copy-bibtex" type="button">
+        <span class="icon is-small"><i class="far fa-copy"></i></span>
+        <span class="copy-label">Copy</span>
+      </button>
+      <pre><code id="bibtex-code">@inproceedings{NguyenMMM2027,
+  title = {Directional Dual-Head Supervision for Real-Time Source-Free Polyp Segmentation},
+  author = {Nguyen, Hai-Dang and Le, Nhat-Khoi and Huynh, Huu-Thuan and Tran, Minh-Triet and Le, Trung-Nghia},
+  booktitle = {International Conference on Multimedia Modeling (MMM)},
+  year = {2027},
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="content has-text-centered">
+      <a class="icon-link" href="https://github.com/DanielNguyen-05/MedRT-SFOD" target="_blank" rel="noopener"
+         aria-label="GitHub repository">
+        <i class="fab fa-github"></i>
+      </a>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content has-text-centered footer-note">
+          <p>
+            This website is licensed under a
+            <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons
+              Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+          <p>
+            Website template adapted from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
