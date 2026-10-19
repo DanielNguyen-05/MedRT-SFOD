@@ -1,0 +1,248 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Python build / packaging
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Python tooling / test caches
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pyre/
+.pytype/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+.hypothesis/
+
+# Jupyter
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# IDE / editors
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+.settings/
+
+# OS-generated files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs / temporary files
+# logs/
+# *.log
+*.out
+*.err
+*.pid
+*.pid.lock
+*.seed
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+tmp/
+temp/
+.cache/
+cache/
+nohup.out
+
+# Datasets
+dataset/
+datasets/
+data/raw/
+data/processed/
+data/cache/
+*.cache
+labels.cache
+
+# Experiment outputs
+runs/
+results/
+outputs/
+output/
+artifacts/
+checkpoints/
+weights/
+
+# Experiment trackers
+tensorboard/
+tb_logs/
+wandb/
+mlruns/
+lightning_logs/
+
+# Model checkpoints / exported models
+*.pt
+*.pth
+*.ckpt
+*.weights
+*.onnx
+*.engine
+*.torchscript
+*.tflite
+*.edgetpu
+*.pb
+*.mlmodel
+*.coreml
+*.trt
+*.safetensors
+*.saved_model/
+
+# Large generated numerical files
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+
+# Profiling / benchmarking
+*.prof
+*.lprof
+*.flamegraph
+profile/
+profiles/
+benchmark_results/
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+credentials/
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Compiler / CUDA outputs
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.dylib
+*.exe
+*.bin
+*.cubin
+*.ptx
+*.fatbin
+
+# CMake
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Ultralytics local settings
+Ultralytics/
+ultralytics/settings.json
+
+# Local repair / backup directories
+ultralytics_mixed_backup/
+ultralytics_backup/
+*_backup/
+*_backup_*/
+backup/
+backups/
+
+# Downloaded archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.tbz2
+*.7z
+*.rar
+
+# Large media
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Usually dataset/debug images should not be committed
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
+*.webp
+
+# Allow documentation/repository assets
+!docs/assets/
+!docs/assets/**
+!assets/
+!assets/**
+
+# RASP audit / benchmark outputs
+rasp_audit*.json
+rasp_depgraph_audit*.json
+*_audit.json
+*_profile.json
+*_benchmark.json
+
+# Local shell/session files
+.history
+.bash_history
+.zsh_history
+
+logs/
+runs/
+colab/
+tests/
