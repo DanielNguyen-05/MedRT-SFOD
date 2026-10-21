@@ -242,18 +242,7 @@ rasp_depgraph_audit*.json
 .bash_history
 .zsh_history
 
-# ============================================================
-# Intentionally tracked:
-#   scripts/
-#   configs/
-#   ultralytics/
-#   colab/*.ipynb
-#   *.py
-#   *.sh
-#   *.yaml / *.yml
-#   *.md
-#   requirements*.txt
-# ============================================================
 logs/
-
-logs/
+runs/
+colab/
+tests/
